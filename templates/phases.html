@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attack Phases - Attack Flow Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">Attack Flow Analyzer</span>
+            <div>
+                <a href="/" class="btn btn-outline-light btn-sm me-2">Dashboard</a>
+                <a href="/upload" class="btn btn-outline-light btn-sm me-2">Upload Logs</a>
+                <a href="/timeline" class="btn btn-outline-light btn-sm me-2">Timeline</a>
+                <a href="/phases" class="btn btn-outline-light btn-sm me-2">Phases</a>
+                <a href="/iocs" class="btn btn-outline-light btn-sm">IOCs</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">Attack Phase Analysis</h1>
+
+        <div class="row">
+            {% if phase_stats %}
+            {% for phase, stats in phase_stats.items() %}
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header" style="background-color: {% if phase == 'reconnaissance' %}#FF6B6B{% elif phase == 'initial_access' %}#4ECDC4{% elif phase == 'lateral_movement' %}#45B7D1{% elif phase == 'exfiltration' %}#FFA07A{% else %}#95A5A6{% endif %}; color: white;">
+                        <h5 class="mb-0">{{ phase.replace('_', ' ').title() }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Event Count:</strong> {{ stats.count }}</p>
+                        <p><strong>Percentage:</strong> {{ "%.2f"|format(stats.percentage) }}%</p>
+                        <p><strong>Average Confidence:</strong> {{ "%.2f"|format(stats.average_confidence) }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="col-md-12">
+                <div class="alert alert-warning">No phase statistics available. Please upload and analyze logs first.</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if timeline_stats %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Timeline Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <p><strong>Total Events:</strong> {{ timeline_stats.total_events or 0 }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Total Duration:</strong> {{ "%.2f"|format(timeline_stats.total_duration_hours or 0) }} hours</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Most Frequent Phase:</strong> {{ timeline_stats.most_frequent_phase.phase if timeline_stats.most_frequent_phase else 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Longest Phase:</strong> {{ timeline_stats.longest_phase.phase if timeline_stats.longest_phase else 'N/A' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

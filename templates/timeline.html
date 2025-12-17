@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline - Attack Flow Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">Attack Flow Analyzer</span>
+            <div>
+                <a href="/" class="btn btn-outline-light btn-sm me-2">Dashboard</a>
+                <a href="/upload" class="btn btn-outline-light btn-sm me-2">Upload Logs</a>
+                <a href="/timeline" class="btn btn-outline-light btn-sm me-2">Timeline</a>
+                <a href="/phases" class="btn btn-outline-light btn-sm me-2">Phases</a>
+                <a href="/iocs" class="btn btn-outline-light btn-sm">IOCs</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">Attack Timeline</h1>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <div id="timeline-chart"></div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Phase Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="phase-stats"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Timeline Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="timeline-stats"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Event Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="events-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Phase</th>
+                                <th>Source IP</th>
+                                <th>Path/Message</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <script>
+        const phaseColors = {
+            'reconnaissance': '#FF6B6B',
+            'initial_access': '#4ECDC4',
+            'lateral_movement': '#45B7D1',
+            'exfiltration': '#FFA07A',
+            'unknown': '#95A5A6'
+        };
+
+        async function loadTimeline() {
+            try {
+                const response = await fetch('/api/timeline');
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('timeline-chart').innerHTML = 
+                        '<div class="alert alert-warning">No timeline data available. Please upload and analyze logs first.</div>';
+                    return;
+                }
+
+                // Create timeline visualization
+                const events = data.events || [];
+                const timestamps = events.map(e => new Date(e.timestamp));
+                const phases = events.map(e => e.phase);
+                const colors = phases.map(p => phaseColors[p] || phaseColors['unknown']);
+
+                const trace = {
+                    x: timestamps,
+                    y: phases,
+                    mode: 'markers',
+                    type: 'scatter',
+                    marker: {
+                        size: 10,
+                        color: colors,
+                        line: { width: 1, color: 'white' }
+                    },
+                    text: events.map(e => `${e.source_ip}<br>${e.path || e.message}`),
+                    hovertemplate: '<b>%{y}</b><br>Time: %{x}<br>%{text}<extra></extra>'
+                };
+
+                const layout = {
+                    title: 'Attack Timeline',
+                    xaxis: { title: 'Time' },
+                    yaxis: { title: 'Attack Phase', categoryorder: 'array', categoryarray: ['reconnaissance', 'initial_access', 'lateral_movement', 'exfiltration', 'unknown'] },
+                    height: 500,
+                    hovermode: 'closest'
+                };
+
+                Plotly.newPlot('timeline-chart', [trace], layout);
+
+                // Display phase statistics
+                const phaseStatsDiv = document.getElementById('phase-stats');
+                let phaseStatsHtml = '<ul class="list-group">';
+                for (const [phase, stats] of Object.entries(data.phases || {})) {
+                    phaseStatsHtml += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span style="color: ${phaseColors[phase] || phaseColors['unknown']}">${phase}</span>
+                            <span class="badge bg-primary rounded-pill">${stats.count} events</span>
+                            <small class="text-muted">${(stats.duration_seconds / 3600).toFixed(2)} hours</small>
+                        </li>
+                    `;
+                }
+                phaseStatsHtml += '</ul>';
+                phaseStatsDiv.innerHTML = phaseStatsHtml;
+
+                // Display timeline statistics
+                const timelineStatsDiv = document.getElementById('timeline-stats');
+                const stats = data.statistics || {};
+                timelineStatsDiv.innerHTML = `
+                    <ul class="list-group">
+                        <li class="list-group-item">Total Events: <strong>${stats.total_events || 0}</strong></li>
+                        <li class="list-group-item">Duration: <strong>${(stats.total_duration_hours || 0).toFixed(2)} hours</strong></li>
+                        <li class="list-group-item">Most Frequent Phase: <strong>${stats.most_frequent_phase?.phase || 'N/A'}</strong></li>
+                        <li class="list-group-item">Longest Phase: <strong>${stats.longest_phase?.phase || 'N/A'}</strong></li>
+                        <li class="list-group-item">Phase Transitions: <strong>${stats.phase_transitions || 0}</strong></li>
+                    </ul>
+                `;
+
+                // Display events table
+                const tbody = document.getElementById('events-tbody');
+                tbody.innerHTML = '';
+                events.slice(0, 100).forEach(event => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${new Date(event.timestamp).toLocaleString()}</td>
+                        <td><span class="badge" style="background-color: ${phaseColors[event.phase] || phaseColors['unknown']}">${event.phase}</span></td>
+                        <td>${event.source_ip || '-'}</td>
+                        <td>${(event.path || event.message || '-').substring(0, 50)}</td>
+                        <td>${event.status_code || '-'}</td>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error loading timeline:', error);
+            }
+        }
+
+        loadTimeline();
+    </script>
+</body>
+</html>
