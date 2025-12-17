@@ -39,4 +39,5 @@ tmp/
 # Exports
 exports/
 *.json
+!rules/*.json
 *.csv
