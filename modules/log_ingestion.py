@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
+from dateutil import parser as date_parser
 import config
 
 
@@ -38,8 +39,7 @@ class LogParser:
         
         # Try dateutil as fallback
         try:
-            from dateutil import parser
-            return parser.parse(timestamp_str)
+            return date_parser.parse(timestamp_str)
         except:
             self.errors.append(f"Failed to parse timestamp: {timestamp_str}")
             return None

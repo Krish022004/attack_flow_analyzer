@@ -64,7 +64,7 @@ attack_flow_analyzer/
    ```
 
 2. **Access the web interface:**
-   Open your browser and navigate to `http://localhost:5000`
+   Open your browser and navigate to `http://localhost:5001`
 
 ### Using the Application
 
@@ -169,7 +169,6 @@ The application provides the following API endpoints:
 
 - **Python 3.8+**: Core language
 - **Flask**: Web framework
-- **Pandas**: Data manipulation
 - **Plotly**: Timeline visualization
 - **Bootstrap 5**: UI framework
 
