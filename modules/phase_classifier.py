@@ -166,11 +166,25 @@ class PhaseClassifier:
             r'^172\.(1[6-9]|2[0-9]|3[0-1])\.',
         ]
         
+        has_internal = False
         for ip in [source_ip, dest_ip]:
             if ip:
                 for pattern in internal_patterns:
                     if re.match(pattern, ip):
-                        return 1.0
+                        has_internal = True
+                        break
+                if has_internal:
+                    break
+        
+        # Also check if event involves internal network communication
+        if has_internal:
+            # Check if it's a connection attempt (not just web access)
+            log_type = event.get('log_type', '')
+            if log_type in ['firewall', 'authentication']:
+                return 1.0
+            # For web access, give partial score
+            elif source_ip and dest_ip and has_internal:
+                return 0.7
         
         return 0.0
     
@@ -225,6 +239,12 @@ class PhaseClassifier:
         scores['reconnaissance']['status_code'] = self._check_status_codes(event, 'reconnaissance')
         scores['reconnaissance']['user_agent'] = self._check_suspicious_user_agent(event)
         
+        # Additional reconnaissance: 404 errors on common paths
+        path = event.get('path', '').lower()
+        status = event.get('status_code', 0)
+        if status == 404 and any(pattern in path for pattern in ['admin', 'login', 'wp-', 'phpmyadmin', 'test', 'api', 'config', 'backup']):
+            scores['reconnaissance']['url_pattern'] = max(scores['reconnaissance']['url_pattern'], 0.5)
+        
         # Initial access indicators
         scores['initial_access']['sql_injection'] = self._check_sql_injection(event)
         scores['initial_access']['xss'] = self._check_xss(event)
@@ -250,8 +270,34 @@ class PhaseClassifier:
         # Determine primary phase
         primary_phase = max(phase_confidences.items(), key=lambda x: x[1])
         
+        # Lower threshold to 0.1 to catch more events, but still prefer higher confidence
+        # If confidence is very low (< 0.1), mark as unknown
+        # If confidence is low but > 0.1, still assign the phase but with lower confidence
+        phase_threshold = 0.1
+        
         classified_event = event.copy()
-        classified_event['attack_phase'] = primary_phase[0] if primary_phase[1] > 0.3 else 'unknown'
+        if primary_phase[1] > phase_threshold:
+            classified_event['attack_phase'] = primary_phase[0]
+        else:
+            # Try to infer phase from context even with low confidence
+            # Check if any indicator scored > 0
+            max_score = max([max(scores[phase].values()) if scores[phase] else 0 for phase in scores])
+            if max_score > 0:
+                # Use the phase with the highest individual indicator score
+                best_phase = None
+                best_indicator_score = 0
+                for phase in scores:
+                    for indicator, score in scores[phase].items():
+                        if score > best_indicator_score:
+                            best_indicator_score = score
+                            best_phase = phase
+                if best_phase:
+                    classified_event['attack_phase'] = best_phase
+                else:
+                    classified_event['attack_phase'] = 'unknown'
+            else:
+                classified_event['attack_phase'] = 'unknown'
+        
         classified_event['phase_confidence'] = primary_phase[1]
         classified_event['phase_scores'] = phase_confidences
         

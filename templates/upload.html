@@ -5,75 +5,158 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Logs - Attack Flow Analyzer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
 </head>
 <body>
-    <nav class="navbar navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">Attack Flow Analyzer</span>
-            <div>
-                <a href="/" class="btn btn-outline-light btn-sm me-2">Dashboard</a>
-                <a href="/upload" class="btn btn-outline-light btn-sm me-2">Upload Logs</a>
-                <a href="/timeline" class="btn btn-outline-light btn-sm me-2">Timeline</a>
-                <a href="/phases" class="btn btn-outline-light btn-sm me-2">Phases</a>
-                <a href="/iocs" class="btn btn-outline-light btn-sm">IOCs</a>
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>Attack Flow Analyzer
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/upload">
+                            <i class="fas fa-upload me-1"></i>Upload Logs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/timeline">
+                            <i class="fas fa-timeline me-1"></i>Timeline
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/phases">
+                            <i class="fas fa-project-diagram me-1"></i>Phases
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/iocs">
+                            <i class="fas fa-exclamation-triangle me-1"></i>IOCs
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <h1 class="mb-4">Upload Log Files</h1>
+    <div class="container mt-4 animate-fade-in">
+        <h1 class="mb-4 text-gradient">
+            <i class="fas fa-upload me-2"></i>Upload Log Files
+        </h1>
 
         <div class="row">
             <div class="col-md-8">
-                <div class="card">
+                <div class="card shadow-hover">
                     <div class="card-header">
-                        <h5>Select Log Files</h5>
+                        <h5 class="mb-0"><i class="fas fa-file-upload me-2"></i>Select Log Files</h5>
                     </div>
                     <div class="card-body">
-                        <form id="upload-form">
-                            <div class="mb-3">
-                                <label for="log-files" class="form-label">Log Files (Multiple files supported)</label>
-                                <input type="file" class="form-control" id="log-files" multiple accept=".log,.txt">
-                                <div class="form-text">Supported formats: Apache/Nginx access logs, authentication logs, firewall logs</div>
+                        <!-- Drag and Drop Area -->
+                        <div class="upload-area" id="upload-area">
+                            <div class="upload-area-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
                             </div>
-                            <button type="submit" class="btn btn-primary">Upload Files</button>
-                        </form>
+                            <h5>Drag & Drop Files Here</h5>
+                            <p class="text-muted mb-3">or click to browse</p>
+                            <input type="file" class="d-none" id="log-files" multiple accept=".log,.txt">
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('log-files').click()">
+                                <i class="fas fa-folder-open me-2"></i>Browse Files
+                            </button>
+                            <div class="form-text mt-3">Supported formats: Apache/Nginx access logs, authentication logs, firewall logs</div>
+                        </div>
+
+                        <!-- File List -->
+                        <div id="file-list" class="mt-4" style="display: none;">
+                            <h6 class="mb-3"><i class="fas fa-list me-2"></i>Selected Files</h6>
+                            <div id="file-items"></div>
+                        </div>
+
+                        <!-- Upload Progress -->
+                        <div id="upload-progress" class="mt-3" style="display: none;">
+                            <div class="progress-indicator">
+                                <div class="progress-text">Uploading files...</div>
+                                <div class="progress-bar-container">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             role="progressbar" 
+                                             style="width: 0%"
+                                             id="upload-progress-bar"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div id="upload-status" class="mt-3"></div>
-                        <div id="uploaded-files" class="mt-3"></div>
+
+                        <!-- Upload Button -->
+                        <div class="mt-3" id="upload-button-container" style="display: none;">
+                            <button type="button" class="btn btn-primary btn-lg" id="upload-button">
+                                <i class="fas fa-upload me-2"></i>Upload Files
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="card mt-4" id="analyze-card" style="display: none;">
+                <!-- Analysis Card -->
+                <div class="card mt-4 shadow-hover" id="analyze-card" style="display: none;">
                     <div class="card-header">
-                        <h5>Run Analysis</h5>
+                        <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Run Analysis</h5>
                     </div>
                     <div class="card-body">
-                        <button class="btn btn-success" onclick="runAnalysis()">Analyze Logs</button>
+                        <div id="uploaded-files-list" class="mb-3"></div>
+                        
+                        <!-- Analysis Progress -->
+                        <div id="analysis-progress" class="mb-3" style="display: none;">
+                            <div class="progress-indicator">
+                                <div class="progress-text" id="analysis-progress-text">Analyzing logs...</div>
+                                <div class="progress-bar-container">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                             role="progressbar" 
+                                             style="width: 0%"
+                                             id="analysis-progress-bar"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success btn-lg" onclick="runAnalysis()" id="analyze-button">
+                            <i class="fas fa-play me-2"></i>Analyze Logs
+                        </button>
                         <div id="analysis-status" class="mt-3"></div>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-4">
-                <div class="card">
+                <div class="card shadow-hover">
                     <div class="card-header">
-                        <h5>Instructions</h5>
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Instructions</h5>
                     </div>
                     <div class="card-body">
-                        <ol>
-                            <li>Select one or more log files</li>
-                            <li>Click "Upload Files" to upload</li>
-                            <li>Click "Analyze Logs" to start analysis</li>
+                        <ol class="mb-4">
+                            <li class="mb-2">Select one or more log files using the drag-and-drop area or browse button</li>
+                            <li class="mb-2">Click "Upload Files" to upload them to the server</li>
+                            <li class="mb-2">Click "Analyze Logs" to start the analysis process</li>
                             <li>View results in Timeline, Phases, and IOCs pages</li>
                         </ol>
                         <hr>
-                        <p><strong>Supported Log Types:</strong></p>
+                        <p><strong><i class="fas fa-file-alt me-2"></i>Supported Log Types:</strong></p>
                         <ul>
-                            <li>Apache/Nginx access logs</li>
-                            <li>Authentication logs (syslog format)</li>
-                            <li>Firewall logs</li>
+                            <li><i class="fas fa-server me-2 text-primary"></i>Apache/Nginx access logs</li>
+                            <li><i class="fas fa-key me-2 text-success"></i>Authentication logs (syslog format)</li>
+                            <li><i class="fas fa-fire me-2 text-danger"></i>Firewall logs</li>
                         </ul>
                     </div>
                 </div>
@@ -82,90 +165,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let uploadedFiles = [];
-
-        document.getElementById('upload-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const fileInput = document.getElementById('log-files');
-            const files = fileInput.files;
-            
-            if (files.length === 0) {
-                alert('Please select at least one file');
-                return;
-            }
-
-            const formData = new FormData();
-            for (let file of files) {
-                formData.append('files[]', file);
-            }
-
-            const statusDiv = document.getElementById('upload-status');
-            statusDiv.innerHTML = '<div class="spinner-border" role="status"><span class="visually-hidden">Uploading...</span></div>';
-
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-                
-                if (response.ok) {
-                    statusDiv.innerHTML = '<div class="alert alert-success">Files uploaded successfully!</div>';
-                    uploadedFiles = data.files;
-                    document.getElementById('analyze-card').style.display = 'block';
-                    displayUploadedFiles();
-                } else {
-                    statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
-                }
-            } catch (error) {
-                statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-            }
-        });
-
-        function displayUploadedFiles() {
-            const filesDiv = document.getElementById('uploaded-files');
-            filesDiv.innerHTML = '<h6>Uploaded Files:</h6><ul class="list-group">';
-            uploadedFiles.forEach(file => {
-                filesDiv.innerHTML += `<li class="list-group-item">${file}</li>`;
-            });
-            filesDiv.innerHTML += '</ul>';
-        }
-
-        async function runAnalysis() {
-            if (uploadedFiles.length === 0) {
-                alert('Please upload files first');
-                return;
-            }
-
-            const statusDiv = document.getElementById('analysis-status');
-            statusDiv.innerHTML = '<div class="spinner-border" role="status"><span class="visually-hidden">Analyzing...</span></div>';
-
-            try {
-                const response = await fetch('/analyze', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ files: uploadedFiles })
-                });
-
-                const data = await response.json();
-                
-                if (response.ok) {
-                    statusDiv.innerHTML = '<div class="alert alert-success">Analysis completed successfully! <a href="/timeline">View Timeline</a></div>';
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 2000);
-                } else {
-                    statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
-                }
-            } catch (error) {
-                statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
-            }
-        }
-    </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
 </body>
 </html>

@@ -5,26 +5,112 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timeline - Attack Flow Analyzer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
 </head>
 <body>
-    <nav class="navbar navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">Attack Flow Analyzer</span>
-            <div>
-                <a href="/" class="btn btn-outline-light btn-sm me-2">Dashboard</a>
-                <a href="/upload" class="btn btn-outline-light btn-sm me-2">Upload Logs</a>
-                <a href="/timeline" class="btn btn-outline-light btn-sm me-2">Timeline</a>
-                <a href="/phases" class="btn btn-outline-light btn-sm me-2">Phases</a>
-                <a href="/iocs" class="btn btn-outline-light btn-sm">IOCs</a>
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>Attack Flow Analyzer
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/upload">
+                            <i class="fas fa-upload me-1"></i>Upload Logs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/timeline">
+                            <i class="fas fa-timeline me-1"></i>Timeline
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/phases">
+                            <i class="fas fa-project-diagram me-1"></i>Phases
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/iocs">
+                            <i class="fas fa-exclamation-triangle me-1"></i>IOCs
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <h1 class="mb-4">Attack Timeline</h1>
+    <div class="container mt-4 animate-fade-in">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-gradient mb-0">
+                <i class="fas fa-timeline me-2"></i>Attack Timeline
+            </h1>
+            <button class="btn btn-outline-primary" onclick="exportTimeline()" id="export-btn" style="display: none;">
+                <i class="fas fa-download me-2"></i>Export
+            </button>
+        </div>
 
-        <div class="card mb-4">
+        <!-- Filters -->
+        <div class="card mb-4 shadow-hover" id="filters-card" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filters</h5>
+            </div>
+            <div class="card-body">
+                <div class="filter-panel">
+                    <div class="filter-group">
+                        <div class="filter-item">
+                            <label class="form-label">Phase</label>
+                            <select class="form-select" id="phase-filter">
+                                <option value="">All Phases</option>
+                                <option value="reconnaissance">Reconnaissance</option>
+                                <option value="initial_access">Initial Access</option>
+                                <option value="lateral_movement">Lateral Movement</option>
+                                <option value="exfiltration">Exfiltration</option>
+                                <option value="unknown">Unknown</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <label class="form-label">Source IP</label>
+                            <input type="text" class="form-control" id="ip-filter" placeholder="Filter by IP...">
+                        </div>
+                        <div class="filter-item">
+                            <label class="form-label">Time Range</label>
+                            <select class="form-select" id="time-range-filter">
+                                <option value="all">All Time</option>
+                                <option value="1h">Last Hour</option>
+                                <option value="6h">Last 6 Hours</option>
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                            </select>
+                        </div>
+                        <div class="filter-item d-flex align-items-end">
+                            <button class="btn btn-primary" onclick="applyFilters()">
+                                <i class="fas fa-search me-2"></i>Apply Filters
+                            </button>
+                            <button class="btn btn-outline-secondary ms-2" onclick="clearFilters()">
+                                <i class="fas fa-times me-2"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline Chart -->
+        <div class="card mb-4 shadow-hover">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Timeline Visualization</h5>
+            </div>
             <div class="card-body">
                 <div id="timeline-chart"></div>
             </div>
@@ -32,9 +118,9 @@
 
         <div class="row">
             <div class="col-md-6">
-                <div class="card">
+                <div class="card shadow-hover">
                     <div class="card-header">
-                        <h5>Phase Statistics</h5>
+                        <h5 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Phase Statistics</h5>
                     </div>
                     <div class="card-body">
                         <div id="phase-stats"></div>
@@ -42,9 +128,9 @@
                 </div>
             </div>
             <div class="col-md-6">
-                <div class="card">
+                <div class="card shadow-hover">
                     <div class="card-header">
-                        <h5>Timeline Statistics</h5>
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Timeline Statistics</h5>
                     </div>
                     <div class="card-body">
                         <div id="timeline-stats"></div>
@@ -53,25 +139,49 @@
             </div>
         </div>
 
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5>Event Details</h5>
+        <!-- Event Details Table -->
+        <div class="card mt-4 shadow-hover">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Event Details</h5>
+                <div>
+                    <input type="text" class="form-control form-control-sm d-inline-block" 
+                           id="event-search" placeholder="Search events..." style="width: 200px;">
+                </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-striped" id="events-table">
+                    <table class="table table-striped table-hover" id="events-table">
                         <thead>
                             <tr>
-                                <th>Timestamp</th>
-                                <th>Phase</th>
-                                <th>Source IP</th>
+                                <th class="sortable">Timestamp</th>
+                                <th class="sortable">Phase</th>
+                                <th class="sortable">Source IP</th>
                                 <th>Path/Message</th>
-                                <th>Status</th>
+                                <th class="sortable">Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="events-tbody">
                         </tbody>
                     </table>
+                </div>
+                <div id="pagination-container" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Detail Modal -->
+    <div class="modal fade" id="eventModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-info-circle me-2"></i>Event Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="event-modal-body">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -79,103 +189,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-    <script>
-        const phaseColors = {
-            'reconnaissance': '#FF6B6B',
-            'initial_access': '#4ECDC4',
-            'lateral_movement': '#45B7D1',
-            'exfiltration': '#FFA07A',
-            'unknown': '#95A5A6'
-        };
-
-        async function loadTimeline() {
-            try {
-                const response = await fetch('/api/timeline');
-                const data = await response.json();
-
-                if (data.error) {
-                    document.getElementById('timeline-chart').innerHTML = 
-                        '<div class="alert alert-warning">No timeline data available. Please upload and analyze logs first.</div>';
-                    return;
-                }
-
-                // Create timeline visualization
-                const events = data.events || [];
-                const timestamps = events.map(e => new Date(e.timestamp));
-                const phases = events.map(e => e.phase);
-                const colors = phases.map(p => phaseColors[p] || phaseColors['unknown']);
-
-                const trace = {
-                    x: timestamps,
-                    y: phases,
-                    mode: 'markers',
-                    type: 'scatter',
-                    marker: {
-                        size: 10,
-                        color: colors,
-                        line: { width: 1, color: 'white' }
-                    },
-                    text: events.map(e => `${e.source_ip}<br>${e.path || e.message}`),
-                    hovertemplate: '<b>%{y}</b><br>Time: %{x}<br>%{text}<extra></extra>'
-                };
-
-                const layout = {
-                    title: 'Attack Timeline',
-                    xaxis: { title: 'Time' },
-                    yaxis: { title: 'Attack Phase', categoryorder: 'array', categoryarray: ['reconnaissance', 'initial_access', 'lateral_movement', 'exfiltration', 'unknown'] },
-                    height: 500,
-                    hovermode: 'closest'
-                };
-
-                Plotly.newPlot('timeline-chart', [trace], layout);
-
-                // Display phase statistics
-                const phaseStatsDiv = document.getElementById('phase-stats');
-                let phaseStatsHtml = '<ul class="list-group">';
-                for (const [phase, stats] of Object.entries(data.phases || {})) {
-                    phaseStatsHtml += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span style="color: ${phaseColors[phase] || phaseColors['unknown']}">${phase}</span>
-                            <span class="badge bg-primary rounded-pill">${stats.count} events</span>
-                            <small class="text-muted">${(stats.duration_seconds / 3600).toFixed(2)} hours</small>
-                        </li>
-                    `;
-                }
-                phaseStatsHtml += '</ul>';
-                phaseStatsDiv.innerHTML = phaseStatsHtml;
-
-                // Display timeline statistics
-                const timelineStatsDiv = document.getElementById('timeline-stats');
-                const stats = data.statistics || {};
-                timelineStatsDiv.innerHTML = `
-                    <ul class="list-group">
-                        <li class="list-group-item">Total Events: <strong>${stats.total_events || 0}</strong></li>
-                        <li class="list-group-item">Duration: <strong>${(stats.total_duration_hours || 0).toFixed(2)} hours</strong></li>
-                        <li class="list-group-item">Most Frequent Phase: <strong>${stats.most_frequent_phase?.phase || 'N/A'}</strong></li>
-                        <li class="list-group-item">Longest Phase: <strong>${stats.longest_phase?.phase || 'N/A'}</strong></li>
-                        <li class="list-group-item">Phase Transitions: <strong>${stats.phase_transitions || 0}</strong></li>
-                    </ul>
-                `;
-
-                // Display events table
-                const tbody = document.getElementById('events-tbody');
-                tbody.innerHTML = '';
-                events.slice(0, 100).forEach(event => {
-                    const row = tbody.insertRow();
-                    row.innerHTML = `
-                        <td>${new Date(event.timestamp).toLocaleString()}</td>
-                        <td><span class="badge" style="background-color: ${phaseColors[event.phase] || phaseColors['unknown']}">${event.phase}</span></td>
-                        <td>${event.source_ip || '-'}</td>
-                        <td>${(event.path || event.message || '-').substring(0, 50)}</td>
-                        <td>${event.status_code || '-'}</td>
-                    `;
-                });
-            } catch (error) {
-                console.error('Error loading timeline:', error);
-            }
-        }
-
-        loadTimeline();
-    </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/timeline.js') }}"></script>
 </body>
 </html>

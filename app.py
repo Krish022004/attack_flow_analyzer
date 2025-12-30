@@ -46,26 +46,53 @@ def index():
 def upload():
     """File upload interface"""
     if request.method == 'POST':
-        if 'files[]' not in request.files:
-            return jsonify({'error': 'No files provided'}), 400
-        
-        files = request.files.getlist('files[]')
-        uploaded_files = []
-        
-        for file in files:
-            if file.filename:
-                filename = secure_filename(file.filename)
-                filepath = app.config['UPLOAD_FOLDER'] / filename
-                file.save(filepath)
-                uploaded_files.append(filepath)
-        
-        if uploaded_files:
-            return jsonify({
-                'message': f'Uploaded {len(uploaded_files)} file(s)',
-                'files': [str(f) for f in uploaded_files]
-            })
-        
-        return jsonify({'error': 'No valid files uploaded'}), 400
+        try:
+            # Check if files are in the request
+            if 'files[]' not in request.files:
+                # Try alternative key names
+                if 'files' in request.files:
+                    files = request.files.getlist('files')
+                else:
+                    return jsonify({'error': 'No files provided. Please select files to upload.'}), 400
+            else:
+                files = request.files.getlist('files[]')
+            
+            uploaded_files = []
+            
+            for file in files:
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    if not filename:
+                        continue
+                    
+                    # Ensure unique filename to avoid overwrites
+                    filepath = app.config['UPLOAD_FOLDER'] / filename
+                    counter = 1
+                    while filepath.exists():
+                        name_parts = filename.rsplit('.', 1)
+                        if len(name_parts) == 2:
+                            new_filename = f"{name_parts[0]}_{counter}.{name_parts[1]}"
+                        else:
+                            new_filename = f"{filename}_{counter}"
+                        filepath = app.config['UPLOAD_FOLDER'] / new_filename
+                        counter += 1
+                    
+                    try:
+                        file.save(str(filepath))
+                        uploaded_files.append(str(filepath))
+                    except Exception as e:
+                        return jsonify({'error': f'Failed to save file {filename}: {str(e)}'}), 500
+            
+            if uploaded_files:
+                return jsonify({
+                    'message': f'Uploaded {len(uploaded_files)} file(s)',
+                    'files': uploaded_files
+                })
+            else:
+                return jsonify({'error': 'No valid files uploaded. Please check file selection.'}), 400
+                
+        except Exception as e:
+            return jsonify({'error': f'Upload error: {str(e)}'}), 500
     
     return render_template('upload.html')
 
