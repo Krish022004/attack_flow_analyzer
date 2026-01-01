@@ -47,22 +47,31 @@ def upload():
     """File upload interface"""
     if request.method == 'POST':
         try:
+            # Debug: Log request info
+            print(f"Upload request - Content-Type: {request.content_type}")
+            print(f"Upload request - Files keys: {list(request.files.keys())}")
+            
             # Check if files are in the request
             if 'files[]' not in request.files:
                 # Try alternative key names
                 if 'files' in request.files:
                     files = request.files.getlist('files')
+                    print(f"Using 'files' key, found {len(files)} files")
                 else:
+                    print("No files found in request")
                     return jsonify({'error': 'No files provided. Please select files to upload.'}), 400
             else:
                 files = request.files.getlist('files[]')
+                print(f"Using 'files[]' key, found {len(files)} files")
             
             uploaded_files = []
             
             for file in files:
                 if file and file.filename:
                     filename = secure_filename(file.filename)
+                    print(f"Processing file: {file.filename} -> {filename}")
                     if not filename:
+                        print(f"  Skipped: secure_filename returned empty")
                         continue
                     
                     # Ensure unique filename to avoid overwrites
@@ -79,9 +88,13 @@ def upload():
                     
                     try:
                         file.save(str(filepath))
+                        print(f"  Saved to: {filepath}")
                         uploaded_files.append(str(filepath))
                     except Exception as e:
+                        print(f"  Error saving file: {str(e)}")
                         return jsonify({'error': f'Failed to save file {filename}: {str(e)}'}), 500
+                else:
+                    print(f"Skipping invalid file object: {file}")
             
             if uploaded_files:
                 return jsonify({

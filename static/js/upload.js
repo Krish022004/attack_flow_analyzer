@@ -18,11 +18,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setupDragAndDrop();
     setupFileInput();
+    setupUploadButton();
 });
 
 function setupDragAndDrop() {
     const uploadArea = document.getElementById('upload-area');
     const fileInput = document.getElementById('log-files');
+
+    if (!uploadArea || !fileInput) {
+        console.error('Upload area or file input not found');
+        return;
+    }
 
     // Prevent default drag behaviors
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -61,6 +67,10 @@ function handleDrop(e) {
 
 function setupFileInput() {
     const fileInput = document.getElementById('log-files');
+    if (!fileInput) {
+        console.error('File input not found');
+        return;
+    }
     fileInput.addEventListener('change', (e) => {
         handleFiles(e.target.files);
     });
@@ -122,111 +132,125 @@ function removeFile(index) {
     }
 }
 
-// Upload files
-document.getElementById('upload-button').addEventListener('click', async () => {
-    if (selectedFiles.length === 0) {
-        AttackFlowUtils.toast.warning('Please select at least one file');
+function setupUploadButton() {
+    const uploadButton = document.getElementById('upload-button');
+    if (!uploadButton) {
+        console.error('Upload button not found!');
         return;
     }
+    
+    uploadButton.addEventListener('click', async () => {
+        if (selectedFiles.length === 0) {
+            AttackFlowUtils.toast.warning('Please select at least one file');
+            return;
+        }
 
-    const formData = new FormData();
-    selectedFiles.forEach((file, index) => {
-        if (file && file.name) {
-            formData.append('files[]', file, file.name);
-            console.log(`Added file ${index + 1}:`, file.name, file.size, 'bytes');
-        } else {
-            console.warn(`Skipping invalid file at index ${index}`);
+        const formData = new FormData();
+        selectedFiles.forEach((file, index) => {
+            if (file && file.name) {
+                formData.append('files[]', file, file.name);
+                console.log(`Added file ${index + 1}:`, file.name, file.size, 'bytes');
+            } else {
+                console.warn(`Skipping invalid file at index ${index}`);
+            }
+        });
+        
+        console.log('FormData entries:', Array.from(formData.entries()).map(([key, val]) => [key, val instanceof File ? val.name : val]));
+
+        const statusDiv = document.getElementById('upload-status');
+        const progressDiv = document.getElementById('upload-progress');
+        const progressBar = document.getElementById('upload-progress-bar');
+        
+        statusDiv.innerHTML = '';
+        progressDiv.style.display = 'block';
+        progressBar.style.width = '0%';
+
+        // Simulate progress (since we can't track actual upload progress easily)
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 10;
+            if (progress <= 90) {
+                progressBar.style.width = progress + '%';
+            }
+        }, 200);
+
+        try {
+            console.log('Sending upload request...');
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
+
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+
+            let data;
+            try {
+                const responseText = await response.text();
+                console.log('Response text:', responseText);
+                data = JSON.parse(responseText);
+            } catch (e) {
+                console.error('Failed to parse response:', e);
+                throw new Error('Invalid response from server. Please check server logs.');
+            }
+
+            setTimeout(() => {
+                progressDiv.style.display = 'none';
+                
+                if (response.ok) {
+                    AttackFlowUtils.toast.success(`Successfully uploaded ${selectedFiles.length} file(s)`);
+                    uploadedFiles = data.files || [];
+                    if (uploadedFiles.length > 0) {
+                        document.getElementById('analyze-card').style.display = 'block';
+                        displayUploadedFiles();
+                    }
+                    
+                    // Reset file selection
+                    selectedFiles = [];
+                    document.getElementById('log-files').value = '';
+                    document.getElementById('file-list').style.display = 'none';
+                    document.getElementById('upload-button-container').style.display = 'none';
+                } else {
+                    const errorMsg = data.error || data.message || 'Unknown error';
+                    console.error('Upload failed:', errorMsg);
+                    AttackFlowUtils.toast.error('Upload failed: ' + errorMsg);
+                }
+            }, 500);
+        } catch (error) {
+            clearInterval(progressInterval);
+            progressDiv.style.display = 'none';
+            console.error('Upload error:', error);
+            AttackFlowUtils.toast.error('Upload error: ' + error.message);
         }
     });
-    
-    console.log('FormData entries:', Array.from(formData.entries()).map(([key, val]) => [key, val instanceof File ? val.name : val]));
-
-    const statusDiv = document.getElementById('upload-status');
-    const progressDiv = document.getElementById('upload-progress');
-    const progressBar = document.getElementById('upload-progress-bar');
-    
-    statusDiv.innerHTML = '';
-    progressDiv.style.display = 'block';
-    progressBar.style.width = '0%';
-
-    // Simulate progress (since we can't track actual upload progress easily)
-    let progress = 0;
-    const progressInterval = setInterval(() => {
-        progress += 10;
-        if (progress <= 90) {
-            progressBar.style.width = progress + '%';
-        }
-    }, 200);
-
-    try {
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        clearInterval(progressInterval);
-        progressBar.style.width = '100%';
-
-        let data;
-        try {
-            data = await response.json();
-        } catch (e) {
-            throw new Error('Invalid response from server. Please check server logs.');
-        }
-
-        setTimeout(() => {
-            progressDiv.style.display = 'none';
-            
-            if (response.ok) {
-                AttackFlowUtils.toast.success(`Successfully uploaded ${selectedFiles.length} file(s)`);
-                uploadedFiles = data.files || [];
-                if (uploadedFiles.length > 0) {
-                    document.getElementById('analyze-card').style.display = 'block';
-                    displayUploadedFiles();
-                }
-                
-                // Reset file selection
-                selectedFiles = [];
-                document.getElementById('log-files').value = '';
-                document.getElementById('file-list').style.display = 'none';
-                document.getElementById('upload-button-container').style.display = 'none';
-            } else {
-                const errorMsg = data.error || data.message || 'Unknown error';
-                console.error('Upload failed:', errorMsg);
-                AttackFlowUtils.toast.error('Upload failed: ' + errorMsg);
-            }
-        }, 500);
-    } catch (error) {
-        clearInterval(progressInterval);
-        progressDiv.style.display = 'none';
-        console.error('Upload error:', error);
-        AttackFlowUtils.toast.error('Upload error: ' + error.message);
-    }
-});
+}
 
 function displayUploadedFiles() {
     const filesListDiv = document.getElementById('uploaded-files-list');
     filesListDiv.innerHTML = '<h6 class="mb-3"><i class="fas fa-check-circle text-success me-2"></i>Uploaded Files:</h6>';
     
     const listGroup = document.createElement('div');
-        listGroup.className = 'list-group';
-        
-        uploadedFiles.forEach((file, index) => {
-            const listItem = document.createElement('div');
-            listItem.className = 'list-group-item';
-            listItem.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-file-alt text-primary me-3"></i>
-                    <div class="flex-grow-1">
-                        <strong>${file.split('/').pop()}</strong>
-                    </div>
-                    <i class="fas fa-check-circle text-success"></i>
+    listGroup.className = 'list-group';
+    
+    uploadedFiles.forEach((file, index) => {
+        const listItem = document.createElement('div');
+        listItem.className = 'list-group-item';
+        listItem.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="fas fa-file-alt text-primary me-3"></i>
+                <div class="flex-grow-1">
+                    <strong>${file.split('/').pop()}</strong>
                 </div>
-            `;
-            listGroup.appendChild(listItem);
-        });
-        
-        filesListDiv.appendChild(listGroup);
+                <i class="fas fa-check-circle text-success"></i>
+            </div>
+        `;
+        listGroup.appendChild(listItem);
+    });
+    
+    filesListDiv.appendChild(listGroup);
 }
 
 async function runAnalysis() {
@@ -318,4 +342,3 @@ async function runAnalysis() {
         statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
     }
 }
-

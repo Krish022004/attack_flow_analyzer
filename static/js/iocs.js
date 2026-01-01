@@ -61,7 +61,10 @@ function updateStatistics() {
     };
 
     if (stats.total > 0) {
-        document.getElementById('ioc-stats').style.display = 'block';
+        const statsDiv = document.getElementById('ioc-stats');
+        if (statsDiv) {
+            statsDiv.style.display = '';
+        }
         AttackFlowUtils.animateNumber(document.getElementById('total-iocs'), stats.total);
         AttackFlowUtils.animateNumber(document.getElementById('ip-count'), stats.ip);
         AttackFlowUtils.animateNumber(document.getElementById('domain-count'), stats.domain);
