@@ -31,6 +31,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="/packet-capture">
+                            <i class="fas fa-network-wired me-1"></i>Packet Capture
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/timeline">
                             <i class="fas fa-timeline me-1"></i>Timeline
                         </a>
@@ -55,6 +60,12 @@
             <i class="fas fa-upload me-2"></i>Upload Log Files
         </h1>
 
+        <div class="alert alert-info mb-4">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Note:</strong> You can upload log files here (Apache, auth, firewall logs) or 
+            <a href="/packet-capture" class="alert-link">upload pcap files and capture live network traffic</a>.
+        </div>
+
         <div class="row">
             <div class="col-md-8">
                 <div class="card shadow-hover">
@@ -69,7 +80,7 @@
                             </div>
                             <h5>Drag & Drop Files Here</h5>
                             <p class="text-muted mb-3">or click to browse</p>
-                            <input type="file" class="d-none" id="log-files" multiple accept=".log,.txt">
+                            <input type="file" class="d-none" id="log-files" multiple accept=".log,.txt,.pcap,.pcapng">
                             <button type="button" class="btn btn-primary" onclick="document.getElementById('log-files').click()">
                                 <i class="fas fa-folder-open me-2"></i>Browse Files
                             </button>

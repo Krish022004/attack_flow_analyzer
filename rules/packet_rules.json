@@ -1,0 +1,83 @@
+{
+  "packet_analysis": {
+    "port_scan": {
+      "description": "Port scanning activity detection",
+      "threshold": 10,
+      "time_window_minutes": 5,
+      "suspicious_ports": [22, 23, 80, 443, 3389, 3306, 5432, 8080, 8443, 445, 5985, 5986],
+      "confidence": 0.8
+    },
+    "syn_flood": {
+      "description": "SYN flood attack detection",
+      "syn_threshold": 50,
+      "syn_ack_ratio": 10,
+      "confidence": 0.9
+    },
+    "dns_exfiltration": {
+      "description": "DNS-based data exfiltration detection",
+      "min_query_length": 50,
+      "max_subdomains": 5,
+      "base64_pattern": "[A-Za-z0-9+/]{20,}",
+      "confidence": 0.7
+    },
+    "large_transfers": {
+      "description": "Large data transfer detection",
+      "size_threshold_bytes": 10485760,
+      "confidence": 0.6
+    },
+    "suspicious_payloads": {
+      "description": "Suspicious payload patterns",
+      "sql_injection_patterns": [
+        "SELECT.*FROM",
+        "UNION.*SELECT",
+        "DROP.*TABLE",
+        "' OR '1'='1",
+        "'; DROP"
+      ],
+      "xss_patterns": [
+        "<script",
+        "javascript:",
+        "onerror="
+      ],
+      "confidence": 0.8
+    },
+    "internal_communication": {
+      "description": "Internal network communication detection",
+      "private_ranges": [
+        "10.0.0.0/8",
+        "192.168.0.0/16",
+        "172.16.0.0/12"
+      ],
+      "suspicious_ports": [22, 3389, 445, 5985, 5986],
+      "confidence": 0.6
+    }
+  },
+  "protocol_mapping": {
+    "tcp": {
+      "common_ports": {
+        "22": "SSH",
+        "23": "Telnet",
+        "80": "HTTP",
+        "443": "HTTPS",
+        "3306": "MySQL",
+        "5432": "PostgreSQL",
+        "3389": "RDP",
+        "8080": "HTTP-Alt",
+        "8443": "HTTPS-Alt",
+        "445": "SMB",
+        "5985": "WinRM",
+        "5986": "WinRM-HTTPS"
+      }
+    },
+    "udp": {
+      "common_ports": {
+        "53": "DNS",
+        "67": "DHCP",
+        "68": "DHCP",
+        "123": "NTP",
+        "161": "SNMP"
+      }
+    }
+  }
+}
+

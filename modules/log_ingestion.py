@@ -11,6 +11,12 @@ from pathlib import Path
 from dateutil import parser as date_parser
 import config
 
+try:
+    from modules.packet_capture import PcapFileParser
+    PCAP_AVAILABLE = True
+except ImportError:
+    PCAP_AVAILABLE = False
+
 
 class LogParser:
     """Base class for log parsers with common functionality"""
@@ -232,12 +238,18 @@ class LogIngestionEngine:
             'auth': AuthLogParser(),
             'firewall': FirewallLogParser(),
         }
+        if PCAP_AVAILABLE:
+            self.parsers['pcap'] = PcapFileParser()
         self.all_events = []
         self.errors = []
     
     def detect_log_type(self, log_file: Path) -> str:
         """Auto-detect log type from filename and content"""
         filename = log_file.name.lower()
+        
+        # Check for pcap files first (binary files)
+        if filename.endswith('.pcap') or filename.endswith('.pcapng'):
+            return 'pcap'
         
         # Check filename patterns
         if 'access' in filename or 'apache' in filename or 'nginx' in filename:
@@ -247,7 +259,7 @@ class LogIngestionEngine:
         elif 'firewall' in filename or 'iptables' in filename or 'pfsense' in filename:
             return 'firewall'
         
-        # Check first few lines for patterns
+        # Check first few lines for patterns (skip for binary files)
         try:
             with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
                 sample = ''.join([f.readline() for _ in range(5)])

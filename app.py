@@ -6,6 +6,7 @@ Main application entry point
 import os
 import json
 from pathlib import Path
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
 from werkzeug.utils import secure_filename
 import tempfile
@@ -19,10 +20,32 @@ from modules.ioc_extractor import IOCExtractor
 from modules.ioc_exporter import IOCExporter
 from utils.log_generator import LogGenerator
 
+try:
+    from modules.packet_capture import LiveCapture
+    from modules.packet_analyzer import PacketAnalyzer
+    PCAP_AVAILABLE = True
+except ImportError:
+    PCAP_AVAILABLE = False
+
+try:
+    from flask_socketio import SocketIO, emit
+    from flask import request as flask_request
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    SOCKETIO_AVAILABLE = False
+    flask_request = None
+
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 app.config['UPLOAD_FOLDER'] = Path(tempfile.gettempdir()) / 'attack_flow_uploads'
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
+app.config['SECRET_KEY'] = 'attack-flow-analyzer-secret-key'  # Required for SocketIO
+
+# Initialize SocketIO if available
+if SOCKETIO_AVAILABLE:
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', logger=True, engineio_logger=True)
+else:
+    socketio = None
 
 # Global analysis state
 analysis_state = {
@@ -32,6 +55,12 @@ analysis_state = {
     'timeline': None,
     'iocs': {},
     'statistics': {},
+}
+
+# Global capture state
+capture_state = {
+    'live_capture': None,
+    'captured_events': [],
 }
 
 
@@ -182,11 +211,21 @@ def timeline():
 @app.route('/api/timeline')
 def api_timeline():
     """API endpoint for timeline data"""
-    if not analysis_state.get('timeline'):
+    timeline_builder = analysis_state.get('timeline')
+    
+    if not timeline_builder:
         return jsonify({'error': 'No timeline data available'}), 404
     
-    timeline_data = analysis_state['timeline'].get_timeline_data()
-    return jsonify(timeline_data)
+    # Check if timeline has events
+    if not hasattr(timeline_builder, 'timeline_events') or not timeline_builder.timeline_events:
+        return jsonify({'error': 'No timeline data available'}), 404
+    
+    try:
+        timeline_data = timeline_builder.get_timeline_data()
+        return jsonify(timeline_data)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': f'Error retrieving timeline data: {str(e)}'}), 500
 
 
 @app.route('/phases')
@@ -267,6 +306,311 @@ def api_correlation():
     return jsonify(analysis_state.get('correlated', {}))
 
 
+@app.route('/packet-capture')
+def packet_capture():
+    """Packet capture interface page"""
+    return render_template('packet_capture.html')
+
+
+@app.route('/capture/start', methods=['POST'])
+def capture_start():
+    """Start live packet capture"""
+    if not PCAP_AVAILABLE:
+        return jsonify({'error': 'Packet capture not available. Please install scapy: pip install scapy'}), 503
+    
+    try:
+        data = request.get_json() or {}
+        interface = data.get('interface', None)
+        duration = data.get('duration', None)
+        packet_count = data.get('packet_count', 1000)
+        
+        # Stop existing capture if any
+        if capture_state.get('live_capture'):
+            try:
+                capture_state['live_capture'].stop_capture()
+            except:
+                pass
+        
+        # Start new capture
+        if not PCAP_AVAILABLE:
+            return jsonify({'error': 'Packet capture not available. Install scapy library.'}), 503
+        
+        # Define packet callback for WebSocket streaming
+        def packet_callback(packet_event):
+            """Callback to emit packet to WebSocket clients"""
+            try:
+                if socketio:
+                    # Emit to all connected clients (broadcast=True sends to all)
+                    # Use app context to ensure proper Flask context for background thread
+                    with app.app_context():
+                        socketio.emit('packet_captured', packet_event, namespace='/', broadcast=True)
+                        # Debug: print first few packets
+                        packet_num = packet_event.get('packet_number', '?')
+                        if packet_num and (isinstance(packet_num, int) and packet_num <= 5 or packet_num == '?'):
+                            print(f"Emitted packet {packet_num} via WebSocket to {len(capture_state.get('streaming_clients', set()))} clients")
+            except Exception as e:
+                # Log error but don't fail capture
+                import traceback
+                print(f"Error emitting packet via WebSocket: {e}")
+                traceback.print_exc()
+            
+        live_capture = LiveCapture(interface=interface, packet_count=packet_count)
+        if live_capture.start_capture(duration=duration, packet_callback=packet_callback):
+            capture_state['live_capture'] = live_capture
+            return jsonify({
+                'success': True,
+                'message': 'Live capture started',
+                'status': live_capture.get_status()
+            })
+        else:
+            errors = live_capture.errors if hasattr(live_capture, 'errors') else []
+            error_msg = errors[0] if errors else 'Failed to start capture'
+            return jsonify({'error': error_msg}), 500
+            
+    except NameError as e:
+        return jsonify({'error': 'Packet capture module not available. Install scapy: pip install scapy'}), 503
+    except Exception as e:
+        import traceback
+        return jsonify({'error': f'Error starting capture: {str(e)}'}), 500
+
+
+@app.route('/capture/stop', methods=['POST'])
+def capture_stop():
+    """Stop live packet capture"""
+    if not PCAP_AVAILABLE:
+        return jsonify({'error': 'Packet capture not available'}), 503
+    
+    try:
+        if not capture_state['live_capture']:
+            return jsonify({'error': 'No active capture'}), 400
+        
+        # Stop capture and process packets
+        events = capture_state['live_capture'].stop_capture()
+        
+        # Get status after stopping (includes processed packet count)
+        status = capture_state['live_capture'].get_status()
+        
+        # Store events in global state
+        capture_state['captured_events'] = events
+        
+        # Emit all captured packets via WebSocket to connected clients
+        if socketio and capture_state.get('streaming_clients'):
+            # Convert events to JSON-serializable format
+            for event in events:
+                try:
+                    # Ensure timestamp is ISO format string
+                    if isinstance(event.get('timestamp'), datetime):
+                        event['timestamp'] = event['timestamp'].isoformat()
+                    socketio.emit('packet_captured', event, namespace='/')
+                except Exception as e:
+                    print(f"Error emitting captured packet: {e}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Capture stopped. Processed {len(events)} packets.',
+            'packets_captured': len(events),
+            'queued_packets': status.get('queued_packets', 0),
+            'status': status
+        })
+    except Exception as e:
+        import traceback
+        error_msg = f'Error stopping capture: {str(e)}\n{traceback.format_exc()}'
+        return jsonify({'error': error_msg}), 500
+
+
+@app.route('/capture/status', methods=['GET'])
+def capture_status():
+    """Get current capture status"""
+    if not PCAP_AVAILABLE:
+        return jsonify({'error': 'Packet capture not available'}), 503
+    
+    # Check if there's an active capture
+    if capture_state.get('live_capture'):
+        status = capture_state['live_capture'].get_status()
+        return jsonify(status)
+    
+    # No active capture, but return captured events info if available
+    captured_events = capture_state.get('captured_events', [])
+    return jsonify({
+        'is_capturing': False,
+        'packets_captured': len(captured_events),
+        'queued_packets': 0,
+        'statistics': {},
+        'has_captured_packets': len(captured_events) > 0,
+        'packets_analyzed': len(analysis_state.get('events', [])) > 0 if captured_events else False
+    })
+
+
+@app.route('/capture/packets', methods=['GET'])
+def get_captured_packets():
+    """Get all captured packets"""
+    if not PCAP_AVAILABLE:
+        return jsonify({'error': 'Packet capture not available'}), 503
+    
+    try:
+        captured_events = capture_state.get('captured_events', [])
+        
+        # Convert events to JSON-serializable format
+        serializable_events = []
+        for event in captured_events:
+            try:
+                event_copy = {}
+                for key, value in event.items():
+                    # Skip non-serializable fields or convert them
+                    if isinstance(value, datetime):
+                        event_copy[key] = value.isoformat()
+                    elif isinstance(value, bytes):
+                        # Skip payload bytes - too large and not needed for display
+                        if key == 'payload':
+                            continue  # Skip payload field entirely
+                        else:
+                            event_copy[key] = f"<bytes:{len(value)}>"  # Just indicate it's bytes
+                    elif isinstance(value, (dict, list)):
+                        # Recursively handle nested structures
+                        try:
+                            json.dumps(value)  # Test if serializable
+                            event_copy[key] = value
+                        except (TypeError, ValueError):
+                            # Skip non-serializable nested objects
+                            event_copy[key] = str(value)[:200]  # Truncate long strings
+                    elif isinstance(value, (str, int, float, bool, type(None))):
+                        event_copy[key] = value
+                    else:
+                        # Convert other types to string
+                        event_copy[key] = str(value)[:200]
+                
+                serializable_events.append(event_copy)
+            except Exception as e:
+                import traceback
+                print(f"Error serializing event: {e}")
+                traceback.print_exc()
+                continue
+        
+        return jsonify({
+            'packets': serializable_events,
+            'total': len(serializable_events)
+        })
+    except Exception as e:
+        import traceback
+        error_msg = f'Error getting captured packets: {str(e)}\n{traceback.format_exc()}'
+        print(error_msg)
+        return jsonify({'error': f'Error getting captured packets: {str(e)}'}), 500
+
+
+@app.route('/analyze/packets', methods=['POST'])
+def analyze_packets():
+    """Analyze captured packets"""
+    if not PCAP_AVAILABLE:
+        return jsonify({'error': 'Packet capture not available'}), 503
+    
+    try:
+        # Get captured events - check both live_capture and captured_events
+        events = []
+        
+        # First, try to get from live_capture object (if capture was stopped)
+        if capture_state.get('live_capture'):
+            events = capture_state['live_capture'].get_captured_events()
+        
+        # Fallback to captured_events in state
+        if not events:
+            events = capture_state.get('captured_events', [])
+        
+        if not events:
+            return jsonify({'error': 'No packets captured. Please capture packets first.'}), 400
+        
+        # Analyze packets for attack patterns
+        packet_analyzer = PacketAnalyzer()
+        analyzed_events = packet_analyzer.analyze_all(events)
+        packet_stats = packet_analyzer.get_statistics(analyzed_events)
+        
+        # Merge with existing events if any
+        existing_events = analysis_state.get('events', [])
+        all_events = existing_events + analyzed_events  # Create new list to avoid mutating
+        
+        # Run through normal analysis pipeline
+        correlation_engine = CorrelationEngine()
+        correlated = correlation_engine.correlate_all(all_events)
+        
+        phase_classifier = PhaseClassifier()
+        classified = phase_classifier.classify_all(all_events)
+        
+        timeline_builder = TimelineBuilder()
+        timeline_builder.build_timeline(classified)
+        
+        ioc_extractor = IOCExtractor()
+        iocs = ioc_extractor.extract_all(classified)
+        
+        # Update correlation state (convert to dict format)
+        analysis_state['correlated'] = {
+            'ip': {k: v.to_dict() if hasattr(v, 'to_dict') else v for k, v in correlated.get('ip', {}).items()},
+            'user': {k: v.to_dict() if hasattr(v, 'to_dict') else v for k, v in correlated.get('user', {}).items()},
+            'session': {k: v.to_dict() if hasattr(v, 'to_dict') else v for k, v in correlated.get('session', {}).items()},
+        }
+        
+        # Update global state
+        analysis_state['events'] = all_events
+        analysis_state['classified'] = classified
+        analysis_state['timeline'] = timeline_builder
+        analysis_state['iocs'] = iocs
+        
+        # IMPORTANT: Keep captured_events in capture_state for persistence
+        # This allows the packet capture page to show that packets were analyzed
+        capture_state['captured_events'] = events  # Keep original events
+        
+        # Merge statistics (preserve existing, add new)
+        existing_stats = analysis_state.get('statistics', {})
+        analysis_state['statistics'] = {
+            **existing_stats,  # Preserve existing statistics
+            'correlation': correlation_engine.get_statistics(),
+            'phases': phase_classifier.get_statistics(),
+            'timeline': timeline_builder.get_statistics(),
+            'iocs': ioc_extractor.get_statistics(),
+            'packet_analysis': packet_stats,
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Packet analysis completed',
+            'packet_statistics': packet_stats,
+            'total_events': len(all_events),
+            'packets_analyzed': len(events),
+            'statistics': analysis_state['statistics'],  # Include full statistics for frontend
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# WebSocket event handlers for live packet streaming
+if socketio:
+    @socketio.on('connect', namespace='/')
+    def handle_connect():
+        """Handle WebSocket client connection"""
+        from flask import request as flask_request
+        capture_state['streaming_clients'].add(flask_request.sid)
+        emit('connected', {'status': 'connected'})
+    
+    @socketio.on('disconnect', namespace='/')
+    def handle_disconnect():
+        """Handle WebSocket client disconnection"""
+        from flask import request as flask_request
+        capture_state['streaming_clients'].discard(flask_request.sid)
+    
+    @socketio.on('start_stream', namespace='/')
+    def handle_start_stream():
+        """Handle start streaming request"""
+        from flask import request as flask_request
+        capture_state['streaming_clients'].add(flask_request.sid)
+        emit('stream_started', {'status': 'Streaming started'})
+    
+    @socketio.on('stop_stream', namespace='/')
+    def handle_stop_stream():
+        """Handle stop streaming request"""
+        from flask import request as flask_request
+        capture_state['streaming_clients'].discard(flask_request.sid)
+        emit('stream_stopped', {'status': 'Streaming stopped'})
+
+
 if __name__ == '__main__':
     # Generate sample logs on first run if they don't exist
     sample_logs_dir = Path(__file__).parent / 'data' / 'sample_logs'
@@ -275,4 +619,7 @@ if __name__ == '__main__':
         generator = LogGenerator()
         generator.generate_all(sample_logs_dir)
     
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    if socketio:
+        socketio.run(app, debug=True, host='0.0.0.0', port=5001)
+    else:
+        app.run(debug=True, host='0.0.0.0', port=5001)
