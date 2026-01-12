@@ -61,6 +61,7 @@ analysis_state = {
 capture_state = {
     'live_capture': None,
     'captured_events': [],
+    'streaming_clients': set(),
 }
 
 
@@ -340,23 +341,63 @@ def capture_start():
             """Callback to emit packet to WebSocket clients"""
             try:
                 if socketio:
+                    # Ensure streaming_clients exists
+                    if 'streaming_clients' not in capture_state:
+                        capture_state['streaming_clients'] = set()
+                    
+                    # Convert packet_event to JSON-serializable format
+                    serializable_event = {}
+                    for key, value in packet_event.items():
+                        if isinstance(value, datetime):
+                            serializable_event[key] = value.isoformat()
+                        elif isinstance(value, bytes):
+                            # Skip payload bytes - too large
+                            if key == 'payload':
+                                continue
+                            else:
+                                serializable_event[key] = f"<bytes:{len(value)}>"
+                        elif isinstance(value, (dict, list)):
+                            try:
+                                json.dumps(value)  # Test if serializable
+                                serializable_event[key] = value
+                            except (TypeError, ValueError):
+                                serializable_event[key] = str(value)[:200]
+                        elif isinstance(value, (str, int, float, bool, type(None))):
+                            serializable_event[key] = value
+                        else:
+                            serializable_event[key] = str(value)[:200]
+                    
                     # Emit to all connected clients (broadcast=True sends to all)
                     # Use app context to ensure proper Flask context for background thread
                     with app.app_context():
-                        socketio.emit('packet_captured', packet_event, namespace='/', broadcast=True)
-                        # Debug: print first few packets
-                        packet_num = packet_event.get('packet_number', '?')
-                        if packet_num and (isinstance(packet_num, int) and packet_num <= 5 or packet_num == '?'):
-                            print(f"Emitted packet {packet_num} via WebSocket to {len(capture_state.get('streaming_clients', set()))} clients")
+                        socketio.emit('packet_captured', serializable_event, namespace='/', broadcast=True)
+                        # Print packet number to terminal for monitoring
+                        packet_num = serializable_event.get('packet_number', '?')
+                        client_count = len(capture_state.get('streaming_clients', set()))
+                        protocol = serializable_event.get('protocol', 'unknown')
+                        src_ip = serializable_event.get('source_ip', '?')
+                        dst_ip = serializable_event.get('destination_ip', '?')
+                        
+                        # Print every packet to terminal (user requested this)
+                        if isinstance(packet_num, int):
+                            print(f"[Packet #{packet_num}] {protocol.upper()} {src_ip} -> {dst_ip} (sent to {client_count} client(s))")
+                        else:
+                            print(f"[Packet {packet_num}] {protocol.upper()} {src_ip} -> {dst_ip} (sent to {client_count} client(s))")
             except Exception as e:
                 # Log error but don't fail capture
                 import traceback
                 print(f"Error emitting packet via WebSocket: {e}")
                 traceback.print_exc()
             
+        # Log capture parameters
+        interface_str = interface or "default interface (auto-detect)"
+        duration_str = f"{duration} seconds" if duration else "unlimited"
+        print(f"[Capture Start] Interface: {interface_str}, Duration: {duration_str}, Max packets: {packet_count}")
+        
         live_capture = LiveCapture(interface=interface, packet_count=packet_count)
         if live_capture.start_capture(duration=duration, packet_callback=packet_callback):
             capture_state['live_capture'] = live_capture
+            print(f"[Capture Start] Live capture started successfully. Waiting for packets...")
             return jsonify({
                 'success': True,
                 'message': 'Live capture started',
@@ -365,6 +406,7 @@ def capture_start():
         else:
             errors = live_capture.errors if hasattr(live_capture, 'errors') else []
             error_msg = errors[0] if errors else 'Failed to start capture'
+            print(f"[Capture Start] ERROR: {error_msg}")
             return jsonify({'error': error_msg}), 500
             
     except NameError as e:
@@ -395,13 +437,36 @@ def capture_stop():
         
         # Emit all captured packets via WebSocket to connected clients
         if socketio and capture_state.get('streaming_clients'):
-            # Convert events to JSON-serializable format
+            # Convert events to JSON-serializable format for WebSocket
+            # Create a copy so we don't modify the original events (which need datetime objects for analysis)
             for event in events:
                 try:
-                    # Ensure timestamp is ISO format string
-                    if isinstance(event.get('timestamp'), datetime):
-                        event['timestamp'] = event['timestamp'].isoformat()
-                    socketio.emit('packet_captured', event, namespace='/')
+                    # Create a copy for WebSocket emission
+                    ws_event = event.copy()
+                    # Ensure timestamp is ISO format string for JSON serialization
+                    if isinstance(ws_event.get('timestamp'), datetime):
+                        ws_event['timestamp'] = ws_event['timestamp'].isoformat()
+                    # Convert other non-serializable fields
+                    serializable_event = {}
+                    for key, value in ws_event.items():
+                        if isinstance(value, datetime):
+                            serializable_event[key] = value.isoformat()
+                        elif isinstance(value, bytes):
+                            if key == 'payload':
+                                continue  # Skip payload
+                            else:
+                                serializable_event[key] = f"<bytes:{len(value)}>"
+                        elif isinstance(value, (dict, list)):
+                            try:
+                                json.dumps(value)
+                                serializable_event[key] = value
+                            except (TypeError, ValueError):
+                                serializable_event[key] = str(value)[:200]
+                        elif isinstance(value, (str, int, float, bool, type(None))):
+                            serializable_event[key] = value
+                        else:
+                            serializable_event[key] = str(value)[:200]
+                    socketio.emit('packet_captured', serializable_event, namespace='/')
                 except Exception as e:
                     print(f"Error emitting captured packet: {e}")
         
@@ -584,22 +649,29 @@ def analyze_packets():
 # WebSocket event handlers for live packet streaming
 if socketio:
     @socketio.on('connect', namespace='/')
-    def handle_connect():
+    def handle_connect(auth):
         """Handle WebSocket client connection"""
         from flask import request as flask_request
+        if 'streaming_clients' not in capture_state:
+            capture_state['streaming_clients'] = set()
         capture_state['streaming_clients'].add(flask_request.sid)
+        print(f"Client connected: {flask_request.sid}, total clients: {len(capture_state['streaming_clients'])}")
         emit('connected', {'status': 'connected'})
     
     @socketio.on('disconnect', namespace='/')
-    def handle_disconnect():
+    def handle_disconnect(reason):
         """Handle WebSocket client disconnection"""
         from flask import request as flask_request
-        capture_state['streaming_clients'].discard(flask_request.sid)
+        if 'streaming_clients' in capture_state:
+            capture_state['streaming_clients'].discard(flask_request.sid)
+            print(f"Client disconnected: {flask_request.sid}, total clients: {len(capture_state['streaming_clients'])}")
     
     @socketio.on('start_stream', namespace='/')
     def handle_start_stream():
         """Handle start streaming request"""
         from flask import request as flask_request
+        if 'streaming_clients' not in capture_state:
+            capture_state['streaming_clients'] = set()
         capture_state['streaming_clients'].add(flask_request.sid)
         emit('stream_started', {'status': 'Streaming started'})
     
@@ -607,7 +679,8 @@ if socketio:
     def handle_stop_stream():
         """Handle stop streaming request"""
         from flask import request as flask_request
-        capture_state['streaming_clients'].discard(flask_request.sid)
+        if 'streaming_clients' in capture_state:
+            capture_state['streaming_clients'].discard(flask_request.sid)
         emit('stream_stopped', {'status': 'Streaming stopped'})
 
 

@@ -218,6 +218,10 @@ class LiveCapture:
             packet_count = 0
             parser = PcapFileParser()
             
+            # Log capture start
+            interface_info = f"interface '{self.interface}'" if self.interface else "default interface"
+            print(f"[Capture Worker] Starting packet capture on {interface_info}...")
+            
             def packet_handler(packet):
                 nonlocal packet_count
                 if self.stop_event.is_set():
@@ -233,26 +237,26 @@ class LiveCapture:
                         if event:
                             self.packet_counter += 1
                             event['packet_number'] = self.packet_counter
-                            # Convert timestamp to ISO format for JSON serialization
-                            if isinstance(event.get('timestamp'), datetime):
-                                event['timestamp'] = event['timestamp'].isoformat()
-                            # Call callback with parsed packet event
+                            # Keep timestamp as datetime object - will be converted to ISO in callback for WebSocket
+                            # This ensures events stored in captured_events have datetime objects for analysis
+                            # Call callback with parsed packet event (callback will handle serialization)
                             if self.packet_callback:
                                 try:
                                     self.packet_callback(event)
                                 except Exception as callback_error:
-                                    print(f"Error in packet callback: {callback_error}")
+                                    print(f"[Capture Worker] Error in packet callback: {callback_error}")
                                     import traceback
                                     traceback.print_exc()
                     except Exception as e:
                         # Log error but don't fail capture
                         import traceback
-                        print(f"Error parsing packet for streaming: {e}")
+                        print(f"[Capture Worker] Error parsing packet for streaming: {e}")
                         traceback.print_exc()
                 
                 packet_count += 1
                 # Stop if we've reached the packet count limit
                 if packet_count >= self.packet_count:
+                    print(f"[Capture Worker] Reached packet count limit ({self.packet_count}), stopping...")
                     self.stop_event.set()
                 return True
             
@@ -264,18 +268,30 @@ class LiveCapture:
             
             if self.interface:
                 sniff_kwargs['iface'] = self.interface
+                print(f"[Capture Worker] Using interface: {self.interface}")
+            else:
+                print(f"[Capture Worker] Using default interface (scapy will auto-detect)")
             
             if duration:
                 sniff_kwargs['timeout'] = duration
+                print(f"[Capture Worker] Capture will run for {duration} seconds")
             else:
                 # If no duration, use count as limit
                 sniff_kwargs['count'] = self.packet_count
+                print(f"[Capture Worker] Capture will capture up to {self.packet_count} packets")
             
+            print(f"[Capture Worker] Starting sniff()...")
             sniff(**sniff_kwargs)
+            print(f"[Capture Worker] Sniff completed. Total packets captured: {packet_count}")
         except Exception as e:
-            self.errors.append(f"Capture error: {str(e)}")
+            error_msg = f"Capture error: {str(e)}"
+            self.errors.append(error_msg)
+            print(f"[Capture Worker] ERROR: {error_msg}")
+            import traceback
+            traceback.print_exc()
         finally:
             self.is_capturing = False
+            print(f"[Capture Worker] Capture worker finished. is_capturing = {self.is_capturing}")
     
     def stop_capture(self) -> List[Dict]:
         """Stop capture and return captured packets as events"""
