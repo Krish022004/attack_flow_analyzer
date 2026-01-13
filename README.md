@@ -6,6 +6,9 @@ A comprehensive Incident Response Attack-Flow Analyzer that reconstructs end-to-
 
 - **Multi-Source Log Ingestion**: Parse Apache/Nginx access logs, authentication logs, firewall logs, and packet capture files (.pcap, .pcapng)
 - **Live Packet Capture**: Capture and analyze real-time network traffic using scapy
+- **Quick Log Analysis**: Client-side log analysis with instant attack detection (Brute Force, SQL Injection, XSS, DDoS, Port Scan, Suspicious Port)
+- **Packet-to-Log Integration**: Analyze live captured packets directly in the Log Analysis interface
+- **Download Captured Packets**: Export captured packets as downloadable log files for offline analysis
 - **Intelligent Correlation**: Group events by user, IP address, and session
 - **Attack Phase Classification**: Automatically classify events into attack phases (Reconnaissance, Initial Access, Lateral Movement, Exfiltration)
 - **Timeline Visualization**: Interactive timeline showing the chronological sequence of attack events
@@ -36,7 +39,8 @@ attack_flow_analyzer/
 │   ├── timeline.html     # Timeline visualization
 │   ├── phases.html       # Attack phases view
 │   ├── iocs.html         # IOCs view
-│   └── packet_capture.html # Packet capture interface
+│   ├── packet_capture.html # Packet capture interface
+│   └── log_analysis.html  # Quick log analysis interface
 ├── static/               # CSS and JavaScript files
 │   ├── css/
 │   │   ├── style.css     # Main stylesheet
@@ -47,7 +51,8 @@ attack_flow_analyzer/
 │       ├── upload.js     # Upload functionality
 │       ├── timeline.js   # Timeline visualization
 │       ├── iocs.js       # IOCs table management
-│       └── packet_capture.js # Packet capture UI
+│       ├── packet_capture.js # Packet capture UI
+│       └── log_analysis.js  # Quick log analysis and attack detection
 ├── utils/
 │   └── log_generator.py  # Sample log generator
 ├── data/
@@ -120,15 +125,28 @@ attack_flow_analyzer/
    - Stop capture when done
    - Click "Analyze Packets" to process captured packets
 
-3. **View Results:**
+3. **Quick Log Analysis:**
+   - Navigate to "Log Analysis" in the navigation bar
+   - Upload a log file (.log or .txt) for instant client-side analysis, OR
+   - Click "Analyze Captured Packets" to analyze live captured packets
+   - View attack distribution chart, detected attacks list, and detailed attack table
+   - Download captured packets as log file for offline analysis
+
+4. **View Results:**
    - **Dashboard**: Overview statistics and phase distribution
    - **Timeline**: Interactive timeline visualization of attack events
    - **Phases**: Detailed breakdown of each attack phase
    - **IOCs**: List of extracted Indicators of Compromise with filtering options
+   - **Log Analysis**: Quick attack detection with visualizations
 
-4. **Export IOCs:**
+5. **Export IOCs:**
    - Navigate to the IOCs page
    - Click "Export JSON" or "Export CSV" to download IOCs
+
+6. **Download Captured Packets:**
+   - After capturing packets, navigate to "Packet Capture" or "Log Analysis" page
+   - Click "Download as Log File" to export captured packets as a .log file
+   - The downloaded file can be analyzed later or shared with other tools
 
 ### Generating Sample Logs
 
@@ -229,7 +247,12 @@ The application provides the following API endpoints:
 - `POST /capture/start` - Start live packet capture
 - `POST /capture/stop` - Stop live packet capture
 - `GET /capture/status` - Get capture status
+- `GET /capture/packets` - Get all captured packets (JSON)
+- `GET /capture/download` - Download captured packets as log file
 - `POST /analyze/packets` - Analyze captured packets
+
+### Log Analysis Endpoints
+- `GET /log-analysis` - Quick log analysis interface page
 
 ## Technologies Used
 
@@ -240,6 +263,8 @@ The application provides the following API endpoints:
 - **scapy 2.5+**: Packet manipulation and network analysis
 - **python-dateutil**: Robust timestamp parsing
 - **validators**: URL and domain validation
+- **Chart.js**: Client-side attack visualization
+- **flask-socketio**: Real-time WebSocket communication for live packet streaming
 
 ## Algorithm Highlights
 
@@ -254,6 +279,16 @@ The application provides the following API endpoints:
 - Protocol-aware packet parsing (TCP, UDP, ICMP, DNS, HTTP)
 - Attack pattern detection in network traffic
 - Conversion of packets to standardized event format
+- Export captured packets as log files for compatibility with log analysis tools
+
+### Quick Log Analysis
+- Client-side log file parsing and analysis
+- Instant attack detection without server processing
+- Pattern matching for common attacks (Brute Force, SQL Injection, XSS, DDoS)
+- Packet-based attack detection (Port Scan, Suspicious Port)
+- Real-time packet status checking
+- Integration with live packet capture data
+- Visual attack distribution using Chart.js
 
 ### Correlation Engine
 - Hash-based grouping for O(1) lookups

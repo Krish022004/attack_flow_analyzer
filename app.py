@@ -209,6 +209,12 @@ def timeline():
     return render_template('timeline.html')
 
 
+@app.route('/log-analysis')
+def log_analysis():
+    """Log analysis page with client-side attack detection"""
+    return render_template('log_analysis.html')
+
+
 @app.route('/api/timeline')
 def api_timeline():
     """API endpoint for timeline data"""
@@ -367,10 +373,10 @@ def capture_start():
                         else:
                             serializable_event[key] = str(value)[:200]
                     
-                    # Emit to all connected clients (broadcast=True sends to all)
+                    # Emit to all connected clients (omitting 'to' parameter broadcasts to all)
                     # Use app context to ensure proper Flask context for background thread
                     with app.app_context():
-                        socketio.emit('packet_captured', serializable_event, namespace='/', broadcast=True)
+                        socketio.emit('packet_captured', serializable_event, namespace='/')
                         # Print packet number to terminal for monitoring
                         packet_num = serializable_event.get('packet_number', '?')
                         client_count = len(capture_state.get('streaming_clients', set()))
@@ -560,6 +566,69 @@ def get_captured_packets():
         error_msg = f'Error getting captured packets: {str(e)}\n{traceback.format_exc()}'
         print(error_msg)
         return jsonify({'error': f'Error getting captured packets: {str(e)}'}), 500
+
+
+@app.route('/capture/download', methods=['GET'])
+def download_captured_packets():
+    """Download captured packets as a log file"""
+    if not PCAP_AVAILABLE:
+        return jsonify({'error': 'Packet capture not available'}), 503
+    
+    try:
+        captured_events = capture_state.get('captured_events', [])
+        
+        if not captured_events:
+            return jsonify({'error': 'No packets captured. Please capture packets first.'}), 400
+        
+        # Convert packets to log file format
+        log_lines = []
+        for event in captured_events:
+            try:
+                timestamp = event.get('timestamp', datetime.now())
+                if isinstance(timestamp, str):
+                    timestamp_str = timestamp
+                elif isinstance(timestamp, datetime):
+                    timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    timestamp_str = str(timestamp)
+                
+                source_ip = event.get('source_ip', 'unknown')
+                dest_ip = event.get('destination_ip', 'unknown')
+                protocol = event.get('protocol', 'UNKNOWN')
+                source_port = event.get('source_port', '')
+                dest_port = event.get('destination_port', '')
+                length = event.get('length', 0)
+                info = event.get('info', '')
+                
+                # Format: [timestamp] PROTOCOL source_ip:port -> dest_ip:port LEN:length INFO:details
+                log_line = f"[{timestamp_str}] {protocol.upper()} {source_ip}:{source_port} -> {dest_ip}:{dest_port} LEN:{length} INFO:{info}"
+                log_lines.append(log_line)
+            except Exception as e:
+                print(f"Error formatting packet for log: {e}")
+                continue
+        
+        # Create log file content
+        log_content = '\n'.join(log_lines)
+        
+        # Create temporary file
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False)
+        temp_file.write(log_content)
+        temp_file.close()
+        
+        # Generate filename with timestamp
+        filename = f"captured_packets_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        
+        return send_file(
+            temp_file.name,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='text/plain'
+        )
+    except Exception as e:
+        import traceback
+        error_msg = f'Error downloading captured packets: {str(e)}\n{traceback.format_exc()}'
+        print(error_msg)
+        return jsonify({'error': f'Error downloading captured packets: {str(e)}'}), 500
 
 
 @app.route('/analyze/packets', methods=['POST'])

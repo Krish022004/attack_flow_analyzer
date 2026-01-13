@@ -398,6 +398,12 @@ function setupAnalyzeButton() {
     const analyzeButton = document.getElementById('analyze-packets-button');
     if (analyzeButton) {
         analyzeButton.addEventListener('click', analyzePackets);
+        
+        // Setup download button
+        const downloadButton = document.getElementById('download-packets-button');
+        if (downloadButton) {
+            downloadButton.addEventListener('click', downloadCapturedPackets);
+        }
     }
 }
 
@@ -441,6 +447,10 @@ async function analyzePackets() {
     } finally {
         analyzeButton.disabled = false;
     }
+}
+
+function downloadCapturedPackets() {
+    window.location.href = '/capture/download';
 }
 
 // ============ WebSocket Packet Streaming ============

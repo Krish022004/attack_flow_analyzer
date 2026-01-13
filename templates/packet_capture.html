@@ -50,6 +50,11 @@
                             <i class="fas fa-exclamation-triangle me-1"></i>IOCs
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/log-analysis">
+                            <i class="fas fa-search me-1"></i>Log Analysis
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -217,9 +222,14 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted">Analyze captured packets for attack patterns and integrate with existing analysis.</p>
-                        <button class="btn btn-primary" id="analyze-packets-button">
-                            <i class="fas fa-chart-line me-2"></i>Analyze Packets
-                        </button>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" id="analyze-packets-button">
+                                <i class="fas fa-chart-line me-2"></i>Analyze Packets
+                            </button>
+                            <button class="btn btn-outline-secondary" id="download-packets-button" onclick="downloadCapturedPackets()">
+                                <i class="fas fa-download me-2"></i>Download as Log File
+                            </button>
+                        </div>
                         <div id="analyze-status" class="mt-3"></div>
                     </div>
                 </div>

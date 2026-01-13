@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Security Mini Project Report</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.2cm;
+        }
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 10pt;
+            line-height: 1.3;
+            margin: 0;
+            padding: 0;
+            color: #000;
+        }
+        h1 {
+            font-size: 14pt;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        h2 {
+            font-size: 11pt;
+            font-weight: bold;
+            margin-top: 8px;
+            margin-bottom: 4px;
+        }
+        h3 {
+            font-size: 10pt;
+            font-weight: bold;
+            margin-top: 6px;
+            margin-bottom: 3px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .header p {
+            margin: 2px 0;
+            font-size: 10pt;
+        }
+        .section {
+            margin-bottom: 6px;
+        }
+        p {
+            margin: 3px 0;
+            text-align: justify;
+            font-size: 10pt;
+        }
+        ul, ol {
+            margin: 3px 0;
+            padding-left: 18px;
+        }
+        li {
+            margin: 2px 0;
+            font-size: 10pt;
+        }
+        strong {
+            font-weight: bold;
+        }
+        .screenshot-note {
+            font-style: italic;
+            font-size: 9pt;
+            color: #333;
+        }
+        .folder-structure {
+            font-family: 'Courier New', monospace;
+            font-size: 9pt;
+            background: #f5f5f5;
+            padding: 5px;
+            margin: 3px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <p><strong>PES UNIVERSITY</strong></p>
+        <p><strong>Department of Computer Science and Engineering</strong></p>
+        <p><strong>M.Tech 1st SEM 2025</strong></p>
+        <h1>CYBER SECURITY MINI PROJECT REPORT</h1>
+    </div>
+    
+    <div class="section">
+        <h2>1. Project Title:</h2>
+        <p><strong>Incident Response Attack-Flow Analyzer</strong></p>
+    </div>
+    
+    <div class="section">
+        <h2>2. Abstract:</h2>
+        <p>This project addresses the challenge of manual incident response analysis by developing an automated log analysis tool that reconstructs end-to-end attack lifecycles from multiple log sources. The system automatically correlates events from authentication logs, web server logs, firewall logs, and network packet captures to classify attack phases and extract Indicators of Compromise (IOCs). The solution provides security analysts with a comprehensive web-based dashboard featuring interactive timelines, phase classification, and IOC export capabilities, enabling efficient incident response without requiring commercial SIEM tools.</p>
+    </div>
+    
+    <div class="section">
+        <h2>3. Objectives and Solution:</h2>
+        <p><strong>Objective 1 – Solution:</strong> Multi-source log ingestion and parsing from diverse formats (Apache/Nginx access logs, authentication logs, firewall logs, and .pcap/.pcapng files). Implemented automatic log type detection, timestamp normalization, and regex-based pattern matching for efficient parsing. <span class="screenshot-note">[Screenshot: Log upload interface showing multiple file types supported]</span></p>
+        
+        <p><strong>Objective 2 – Solution:</strong> Automated attack phase classification using rule-based system mapping events to MITRE ATT&CK phases (Reconnaissance, Initial Access, Lateral Movement, Exfiltration). Implemented weighted confidence scoring and pattern matching for accurate classification. <span class="screenshot-note">[Screenshot: Attack phases dashboard showing phase distribution and classified events]</span></p>
+        
+        <p><strong>Objective 3 – Solution:</strong> Interactive timeline visualization and IOC extraction with export functionality. Built Plotly-based timeline showing chronological attack progression and automatic extraction of IPs, domains, URLs, hashes, and user agents with JSON/CSV export. Additionally implemented Quick Log Analysis feature with client-side attack detection for instant analysis of log files and live captured packets, including download capability for captured packets as log files. <span class="screenshot-note">[Screenshot: Interactive timeline visualization, IOC export interface, and Log Analysis dashboard]</span></p>
+    </div>
+    
+    <div class="section">
+        <h2>4. Problem Statement:</h2>
+        <p>Traditional incident response requires security analysts to manually analyze multiple log sources from different systems, making the process time-consuming, error-prone, and inefficient. Analysts struggle to correlate events across different log formats, identify attack progression through various phases, and extract actionable Indicators of Compromise (IOCs). The lack of automated tools for small to medium organizations forces reliance on expensive commercial SIEM solutions, creating a gap in accessible incident response capabilities.</p>
+    </div>
+    
+    <div class="section">
+        <h2>5. Proposed Solution:</h2>
+        <p>The project solves this problem through a comprehensive web-based attack flow analyzer that: (1) Ingests and parses multiple log formats automatically, (2) Correlates events by user, IP address, and session using hash-based algorithms, (3) Classifies events into attack phases using rule-based pattern matching with confidence scoring, (4) Generates interactive timelines showing attack progression, (5) Extracts and categorizes IOCs automatically, (6) Provides real-time packet capture and analysis capabilities, (7) Offers quick client-side log analysis with instant attack detection, and (8) Enables download of captured packets as log files for offline analysis. The solution integrates all components into a single Flask-based web dashboard, making it accessible and user-friendly for security analysts.</p>
+    </div>
+    
+    <div class="section">
+        <h2>6. Tools & Technologies Used:</h2>
+        <ul>
+            <li><strong>Programming Language:</strong> Python 3.8+</li>
+            <li><strong>Web Framework:</strong> Flask 3.0+</li>
+            <li><strong>Packet Analysis:</strong> scapy 2.5+, pyshark 0.6</li>
+            <li><strong>Visualization:</strong> Plotly 5.18+</li>
+            <li><strong>UI Framework:</strong> Bootstrap 5</li>
+            <li><strong>Libraries:</strong> python-dateutil (timestamp parsing), validators (URL/domain validation), flask-socketio (real-time updates)</li>
+            <li><strong>Development Tools:</strong> Git, VS Code</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>7. Algorithms / Techniques Used:</h2>
+        <ul>
+            <li><strong>Regex-based Pattern Matching:</strong> For log parsing and IOC extraction using compiled regular expressions for O(n) complexity</li>
+            <li><strong>Hash-based Correlation:</strong> O(1) lookup using dictionary/hash maps to group events by user, IP, and session identifiers</li>
+            <li><strong>Time-window Correlation:</strong> Groups events within configurable time windows (default 5 minutes) for session-based correlation</li>
+            <li><strong>Rule-based Classification:</strong> Weighted scoring algorithm that matches event patterns against phase-specific rules, calculating confidence scores (0.0-1.0) for each attack phase</li>
+            <li><strong>Event Sorting:</strong> O(n log n) merge sort for chronological timeline construction</li>
+            <li><strong>IOC Deduplication:</strong> Set-based deduplication with metadata tracking (first seen, last seen, event count)</li>
+            <li><strong>Protocol-aware Packet Parsing:</strong> Layer-based packet dissection for TCP, UDP, ICMP, DNS, and HTTP protocols</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>8. Implementation Details:</h2>
+        <p><strong>Modules:</strong> (1) <strong>Log Ingestion Module:</strong> Parses Apache/Nginx, auth, and firewall logs with automatic format detection. (2) <strong>Correlation Engine:</strong> Groups events using hash maps and time windows. (3) <strong>Phase Classifier:</strong> Applies rule-based classification with confidence scoring from JSON rule files. (4) <strong>Timeline Builder:</strong> Sorts events chronologically and groups by phase. (5) <strong>IOC Extractor:</strong> Uses regex patterns to extract IPs, domains, URLs, hashes, and user agents. (6) <strong>Packet Capture Module:</strong> Real-time capture using scapy with background threading. (7) <strong>Quick Log Analysis Module:</strong> Client-side log parsing and attack detection with Chart.js visualization. (8) <strong>Packet Export Module:</strong> Converts captured packets to log file format for download. (9) <strong>Web Dashboard:</strong> Flask routes for upload, analysis, visualization, and export.</p>
+        <p><strong>Workflow:</strong> User uploads logs → Log ingestion parses files → Events correlated by IP/user/session → Phase classifier assigns attack phases → Timeline builder creates chronological view → IOC extractor identifies threats → Results displayed in dashboard with export options. <strong>Alternative Quick Workflow:</strong> User uploads log file or analyzes captured packets → Client-side parser detects attacks instantly → Visual chart and table display results → Option to download captured packets as log file.</p>
+    </div>
+    
+    <div class="section">
+        <h2>9. Results:</h2>
+        <p>The system successfully processes multiple log formats, correlates events across sources, classifies attack phases with high accuracy, and extracts comprehensive IOCs. Outputs include: (1) Interactive timeline showing chronological attack progression, (2) Phase distribution statistics and classified events, (3) Comprehensive IOC list with metadata, (4) Correlation groups showing related events, (5) Real-time packet analysis results, (6) Quick log analysis with instant attack detection (Brute Force, SQL Injection, XSS, DDoS, Port Scan, Suspicious Port), (7) Downloadable log files from captured packets. <span class="screenshot-note">[Screenshots: Dashboard with statistics, Timeline visualization, Phases breakdown, IOC table, Packet capture interface, Log Analysis with attack chart]</span></p>
+    </div>
+    
+    <div class="section">
+        <h2>10. Limitations:</h2>
+        <ul>
+            <li>Currently supports common log formats (Apache/Nginx, syslog, generic firewall) - extensible but requires format-specific parsers</li>
+            <li>Rule-based classification may miss novel attack patterns not covered in rules - could be enhanced with machine learning</li>
+            <li>Limited to text-based logs and standard packet formats (.pcap, .pcapng)</li>
+            <li>IOC extraction depends on log/packet content - may miss encoded or obfuscated IOCs</li>
+            <li>Live packet capture requires root/administrator privileges on Linux/macOS</li>
+            <li>Single-threaded log processing for large files may be slow</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>11. Future Enhancements:</h2>
+        <ul>
+            <li>Machine learning-based phase classification for improved accuracy</li>
+            <li>Support for Windows Event Logs and other proprietary formats</li>
+            <li>Real-time log streaming from remote sources</li>
+            <li>Integration with SIEM systems (Splunk, ELK stack)</li>
+            <li>STIX/TAXII export format for threat intelligence sharing</li>
+            <li>User authentication and multi-user support with role-based access</li>
+            <li>Advanced packet analysis with deep packet inspection (DPI)</li>
+            <li>Network flow analysis and visualization</li>
+            <li>Automated IOC enrichment from threat intelligence feeds</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>12. Conclusion:</h2>
+        <p>The Incident Response Attack-Flow Analyzer successfully demonstrates practical incident response analysis capabilities, providing security analysts with automated correlation, phase classification, and IOC extraction. The system effectively reconstructs attack lifecycles from multiple log sources, making it valuable for security operations teams. The web-based interface ensures accessibility, while real-time packet capture extends analysis to live network traffic. The project achieved its objectives of automating log analysis, classifying attack phases, and extracting IOCs, providing a foundation for further enhancements with machine learning and additional log format support. This project enhanced understanding of incident response workflows, log analysis techniques, network packet analysis, and web application development for security tools.</p>
+    </div>
+    
+    <div class="section">
+        <h2>13. References:</h2>
+        <ul>
+            <li>MITRE ATT&CK Framework - https://attack.mitre.org/</li>
+            <li>Flask Documentation - https://flask.palletsprojects.com/</li>
+            <li>scapy Documentation - https://scapy.readthedocs.io/</li>
+            <li>Plotly Python Documentation - https://plotly.com/python/</li>
+            <li>Common Log Format Specification - Apache/Nginx documentation</li>
+            <li>PES University Cyber Security Project Compendium</li>
+            <li>Python Regular Expressions - https://docs.python.org/3/library/re.html</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>14. Folder Structure:</h2>
+        <div class="folder-structure">
+attack_flow_analyzer/<br>
+├── code/<br>
+│   ├── app.py<br>
+│   ├── config.py<br>
+│   ├── requirements.txt<br>
+│   ├── modules/<br>
+│   │   ├── log_ingestion.py<br>
+│   │   ├── correlation.py<br>
+│   │   ├── phase_classifier.py<br>
+│   │   ├── timeline.py<br>
+│   │   ├── ioc_extractor.py<br>
+│   │   ├── ioc_exporter.py<br>
+│   │   ├── packet_capture.py<br>
+│   │   └── packet_analyzer.py<br>
+│   ├── templates/<br>
+│   ├── static/<br>
+│   ├── utils/<br>
+│   └── rules/<br>
+├── dataset_or_logs/<br>
+│   └── sample_logs/<br>
+│       ├── access.log<br>
+│       ├── auth.log<br>
+│       └── firewall.log<br>
+└── report/<br>
+    └── Report.pdf
+        </div>
+    </div>
+    
+    <div style="margin-top: 10px; text-align: center; font-size: 9pt;">
+        <p><strong>Team Members:</strong> PES1PG25CS025, PES1PG25CS025, PES1PG25CS025</p>
+    </div>
+</body>
+</html>
