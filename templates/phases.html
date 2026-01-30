@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attack Phases - Attack Flow Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>Attack Flow Analyzer
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/upload">
+                            <i class="fas fa-upload me-1"></i>Upload Logs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/packet-capture">
+                            <i class="fas fa-network-wired me-1"></i>Packet Capture
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/timeline">
+                            <i class="fas fa-timeline me-1"></i>Timeline
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/phases">
+                            <i class="fas fa-project-diagram me-1"></i>Phases
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/iocs">
+                            <i class="fas fa-exclamation-triangle me-1"></i>IOCs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/log-analysis">
+                            <i class="fas fa-search me-1"></i>Log Analysis
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4 animate-fade-in">
+        <h1 class="mb-4 text-gradient">
+            <i class="fas fa-project-diagram me-2"></i>Attack Phase Analysis
+        </h1>
+
+        <!-- Phase Flow Diagram -->
+        <div class="card mb-4 shadow-hover">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Attack Flow</h5>
+            </div>
+            <div class="card-body">
+                <div class="phase-flow" id="phase-flow">
+                    <div class="phase-flow-item">
+                        <div class="phase-flow-circle" style="background: linear-gradient(135deg, #FF6B6B 0%, #ff8787 100%);">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="phase-flow-label">Reconnaissance</div>
+                    </div>
+                    <div class="phase-flow-item">
+                        <div class="phase-flow-circle" style="background: linear-gradient(135deg, #4ECDC4 0%, #6ee7d8 100%);">
+                            <i class="fas fa-key"></i>
+                        </div>
+                        <div class="phase-flow-label">Initial Access</div>
+                    </div>
+                    <div class="phase-flow-item">
+                        <div class="phase-flow-circle" style="background: linear-gradient(135deg, #45B7D1 0%, #6bc5e0 100%);">
+                            <i class="fas fa-network-wired"></i>
+                        </div>
+                        <div class="phase-flow-label">Lateral Movement</div>
+                    </div>
+                    <div class="phase-flow-item">
+                        <div class="phase-flow-circle" style="background: linear-gradient(135deg, #FFA07A 0%, #ffb89a 100%);">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <div class="phase-flow-label">Exfiltration</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase Statistics Cards -->
+        <div class="row" id="phase-cards">
+            {% if phase_stats %}
+            {% for phase, stats in phase_stats.items() %}
+            <div class="col-md-6 col-lg-3 mb-4">
+                <div class="card shadow-hover phase-card" data-phase="{{ phase }}">
+                    <div class="card-header text-white" style="background: linear-gradient(135deg, {% if phase == 'reconnaissance' %}#FF6B6B{% elif phase == 'initial_access' %}#4ECDC4{% elif phase == 'lateral_movement' %}#45B7D1{% elif phase == 'exfiltration' %}#FFA07A{% else %}#95A5A6{% endif %} 0%, {% if phase == 'reconnaissance' %}#ff8787{% elif phase == 'initial_access' %}#6ee7d8{% elif phase == 'lateral_movement' %}#6bc5e0{% elif phase == 'exfiltration' %}#ffb89a{% else %}#b8c5c6{% endif %} 100%);">
+                        <h5 class="mb-0">
+                            <i class="fas fa-{% if phase == 'reconnaissance' %}search{% elif phase == 'initial_access' %}key{% elif phase == 'lateral_movement' %}network-wired{% elif phase == 'exfiltration' %}download{% else %}question{% endif %} me-2"></i>
+                            {{ phase.replace('_', ' ').title() }}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted">Event Count</span>
+                                <strong class="fs-4">{{ stats.count }}</strong>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar" 
+                                     style="width: {{ stats.percentage }}%; background-color: {% if phase == 'reconnaissance' %}#FF6B6B{% elif phase == 'initial_access' %}#4ECDC4{% elif phase == 'lateral_movement' %}#45B7D1{% elif phase == 'exfiltration' %}#FFA07A{% else %}#95A5A6{% endif %};">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="border-end">
+                                    <div class="text-muted small">Percentage</div>
+                                    <div class="fw-bold">{{ "%.1f"|format(stats.percentage) }}%</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small">Confidence</div>
+                                <div class="fw-bold">{{ "%.1f"|format(stats.average_confidence * 100) }}%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="col-md-12">
+                <div class="card shadow-hover">
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-project-diagram"></i>
+                            </div>
+                            <div class="empty-state-title">No Phase Data</div>
+                            <div class="empty-state-description">
+                                Please upload and analyze logs first to view phase statistics.
+                            </div>
+                            <a href="/upload" class="btn btn-primary mt-3">
+                                <i class="fas fa-upload me-2"></i>Upload Logs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Timeline Statistics -->
+        {% if timeline_stats %}
+        <div class="card mt-4 shadow-hover">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Timeline Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <i class="fas fa-list fa-2x text-primary mb-2"></i>
+                            <div class="text-muted small">Total Events</div>
+                            <div class="fs-4 fw-bold">{{ timeline_stats.total_events or 0 }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <i class="fas fa-clock fa-2x text-success mb-2"></i>
+                            <div class="text-muted small">Total Duration</div>
+                            <div class="fs-4 fw-bold">{{ "%.2f"|format(timeline_stats.total_duration_hours or 0) }}h</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <i class="fas fa-chart-bar fa-2x text-warning mb-2"></i>
+                            <div class="text-muted small">Most Frequent</div>
+                            <div class="fs-5 fw-bold">{{ timeline_stats.most_frequent_phase.phase.replace('_', ' ').title() if timeline_stats.most_frequent_phase else 'N/A' }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <i class="fas fa-hourglass-half fa-2x text-danger mb-2"></i>
+                            <div class="text-muted small">Longest Phase</div>
+                            <div class="fs-5 fw-bold">{{ timeline_stats.longest_phase.phase.replace('_', ' ').title() if timeline_stats.longest_phase else 'N/A' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Update navigation active state
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.nav-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+
+            // Add click handlers to phase cards
+            document.querySelectorAll('.phase-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    const phase = this.dataset.phase;
+                    window.location.href = `/timeline?phase=${phase}`;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

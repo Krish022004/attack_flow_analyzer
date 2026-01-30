@@ -1,0 +1,115 @@
+{
+  "reconnaissance": {
+    "description": "Initial reconnaissance activities",
+    "indicators": {
+      "url_patterns": [
+        "/.git/",
+        "/.env",
+        "/wp-admin",
+        "/phpmyadmin",
+        "/admin",
+        "/robots.txt",
+        "/sitemap.xml"
+      ],
+      "status_codes": [404, 403],
+      "user_agents": ["scanner", "bot", "crawler"],
+      "request_frequency": {
+        "threshold": 10,
+        "time_window_minutes": 5
+      }
+    },
+    "confidence_weights": {
+      "url_pattern": 0.4,
+      "status_code": 0.2,
+      "user_agent": 0.2,
+      "frequency": 0.2
+    }
+  },
+  "initial_access": {
+    "description": "Attempts to gain initial access",
+    "indicators": {
+      "sql_injection": [
+        "SELECT.*FROM",
+        "UNION.*SELECT",
+        "DROP.*TABLE",
+        "' OR '1'='1",
+        "'; DROP"
+      ],
+      "xss": [
+        "<script",
+        "javascript:",
+        "onerror=",
+        "onclick="
+      ],
+      "path_traversal": [
+        "../",
+        "..\\",
+        "/etc/passwd",
+        "C:\\Windows\\System32"
+      ],
+      "failed_logins": {
+        "threshold": 3,
+        "time_window_minutes": 10
+      }
+    },
+    "confidence_weights": {
+      "sql_injection": 0.3,
+      "xss": 0.25,
+      "path_traversal": 0.25,
+      "failed_logins": 0.2
+    }
+  },
+  "lateral_movement": {
+    "description": "Movement within the network",
+    "indicators": {
+      "internal_ips": [
+        "10.0.0.0/8",
+        "192.168.0.0/16",
+        "172.16.0.0/12"
+      ],
+      "protocols": ["ssh", "rdp", "smb", "winrm"],
+      "commands": [
+        "cmd.exe",
+        "powershell.exe",
+        "wmic.exe",
+        "psexec"
+      ],
+      "internal_connections": {
+        "threshold": 5,
+        "time_window_minutes": 30
+      }
+    },
+    "confidence_weights": {
+      "internal_ips": 0.3,
+      "protocols": 0.3,
+      "commands": 0.2,
+      "internal_connections": 0.2
+    }
+  },
+  "exfiltration": {
+    "description": "Data exfiltration activities",
+    "indicators": {
+      "file_extensions": [".zip", ".tar", ".gz", ".rar", ".7z", ".sql", ".dump"],
+      "endpoints": [
+        "/api/export",
+        "/api/download",
+        "/backup",
+        "/export"
+      ],
+      "large_transfers": {
+        "size_threshold_bytes": 10485760,
+        "threshold": 2
+      },
+      "suspicious_timing": {
+        "off_hours": true,
+        "weekend": true
+      }
+    },
+    "confidence_weights": {
+      "file_extensions": 0.3,
+      "endpoints": 0.3,
+      "large_transfers": 0.3,
+      "suspicious_timing": 0.1
+    }
+  }
+}

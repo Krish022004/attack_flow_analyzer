@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Logs - Attack Flow Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>Attack Flow Analyzer
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/upload">
+                            <i class="fas fa-upload me-1"></i>Upload Logs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/packet-capture">
+                            <i class="fas fa-network-wired me-1"></i>Packet Capture
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/timeline">
+                            <i class="fas fa-timeline me-1"></i>Timeline
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/phases">
+                            <i class="fas fa-project-diagram me-1"></i>Phases
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/iocs">
+                            <i class="fas fa-exclamation-triangle me-1"></i>IOCs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/log-analysis">
+                            <i class="fas fa-search me-1"></i>Log Analysis
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4 animate-fade-in">
+        <h1 class="mb-4 text-gradient">
+            <i class="fas fa-upload me-2"></i>Upload Log Files
+        </h1>
+
+        <div class="alert alert-info mb-4">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Note:</strong> You can upload log files here (Apache, auth, firewall logs) or 
+            <a href="/packet-capture" class="alert-link">upload pcap files and capture live network traffic</a>.
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card shadow-hover">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-file-upload me-2"></i>Select Log Files</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Drag and Drop Area -->
+                        <div class="upload-area" id="upload-area">
+                            <div class="upload-area-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <h5>Drag & Drop Files Here</h5>
+                            <p class="text-muted mb-3">or click to browse</p>
+                            <input type="file" class="d-none" id="log-files" multiple accept=".log,.txt,.pcap,.pcapng">
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('log-files').click()">
+                                <i class="fas fa-folder-open me-2"></i>Browse Files
+                            </button>
+                            <div class="form-text mt-3">Supported formats: Apache/Nginx access logs, authentication logs, firewall logs</div>
+                        </div>
+
+                        <!-- File List -->
+                        <div id="file-list" class="mt-4" style="display: none;">
+                            <h6 class="mb-3"><i class="fas fa-list me-2"></i>Selected Files</h6>
+                            <div id="file-items"></div>
+                        </div>
+
+                        <!-- Upload Progress -->
+                        <div id="upload-progress" class="mt-3" style="display: none;">
+                            <div class="progress-indicator">
+                                <div class="progress-text">Uploading files...</div>
+                                <div class="progress-bar-container">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                             role="progressbar" 
+                                             style="width: 0%"
+                                             id="upload-progress-bar"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="upload-status" class="mt-3"></div>
+
+                        <!-- Upload Button -->
+                        <div class="mt-3" id="upload-button-container" style="display: none;">
+                            <button type="button" class="btn btn-primary btn-lg" id="upload-button">
+                                <i class="fas fa-upload me-2"></i>Upload Files
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Card -->
+                <div class="card mt-4 shadow-hover" id="analyze-card" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Run Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="uploaded-files-list" class="mb-3"></div>
+                        
+                        <!-- Analysis Progress -->
+                        <div id="analysis-progress" class="mb-3" style="display: none;">
+                            <div class="progress-indicator">
+                                <div class="progress-text" id="analysis-progress-text">Analyzing logs...</div>
+                                <div class="progress-bar-container">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                             role="progressbar" 
+                                             style="width: 0%"
+                                             id="analysis-progress-bar"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success btn-lg" onclick="runAnalysis()" id="analyze-button">
+                            <i class="fas fa-play me-2"></i>Analyze Logs
+                        </button>
+                        <div id="analysis-status" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow-hover">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Instructions</h5>
+                    </div>
+                    <div class="card-body">
+                        <ol class="mb-4">
+                            <li class="mb-2">Select one or more log files using the drag-and-drop area or browse button</li>
+                            <li class="mb-2">Click "Upload Files" to upload them to the server</li>
+                            <li class="mb-2">Click "Analyze Logs" to start the analysis process</li>
+                            <li>View results in Timeline, Phases, and IOCs pages</li>
+                        </ol>
+                        <hr>
+                        <p><strong><i class="fas fa-file-alt me-2"></i>Supported Log Types:</strong></p>
+                        <ul>
+                            <li><i class="fas fa-server me-2 text-primary"></i>Apache/Nginx access logs</li>
+                            <li><i class="fas fa-key me-2 text-success"></i>Authentication logs (syslog format)</li>
+                            <li><i class="fas fa-fire me-2 text-danger"></i>Firewall logs</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+</body>
+</html>
